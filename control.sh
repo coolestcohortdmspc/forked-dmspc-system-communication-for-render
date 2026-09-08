@@ -41,11 +41,22 @@ case "$COMMAND" in
 start)
     echo "Starting development environment..."
     docker compose up -d $START
+    #check if these commands are correct for fastapi. 
+    #The reload command refreshes the codebase when starting and should only be used for development
+    # May need to update main:fastapi_app to match what we are actually using.
+    uvicorn main:fastapi_app --host 0.0.0.0 -port 8000 --reload > fastapi.log 2>&1 & #sends output to a log file
+    echo $! > fastapi.pid #save background process
     ;;
 
 stop)
     echo "Stopping development environment..."
     docker compose down
+    #check if fastAPI process file exists. Stops and removes it if it does
+    if [ -f fastapi.pid ]; then
+    kill "$(cat fastapi.pid)" || true
+    rm -f fastapi.pid
+
+    fi
     ;;
 
 shell)

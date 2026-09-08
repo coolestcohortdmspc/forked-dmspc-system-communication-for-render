@@ -11,6 +11,10 @@ Code for prototyping system communication for the ngRadar project. This code is 
 | `control.sh` | A thin wrapper script so the team doesn't need to memorize `docker compose` invocations |
 | `.env` | Environment variables consumed by `/settings.py` (our .env file is never committed to Github - please ask team for the .env file for local dev) |
 
+# Create a Virtual Environment
+# python3 -m venv .venv
+
+
 # Start the Virtual Environment
 # source .venv/bin/activate
 
@@ -53,7 +57,10 @@ Run these commands in your terminal to accomplish any of the following:
 
 ./control.sh agent-up       # If the gbt or vlba droplet's agent fails, start it up again with this command.
 ```
-
+# Commands Within the Control Shell
+python3 manage.py migrate       # Retrieves the latest database migrations and applies them
+python3 manage.py makemigrations       # Creates new database changes
+python3 manage.py createsuperuser       # Allows for a new website user to be created after hard reset or database deletion
 
 ## Summary of Containers:
 For local dev, we have the following services spun up in local Docker containers which you will see using Docker Desktop:  
