@@ -175,26 +175,26 @@ def lock_status(request):
     try:
         # UNCOMMENT TO TEST GRACEFUL FAILURE:
         #raise Exception("TEST CACHE FAILURE")
-
+        currentStatus = None
+        statusCode = None
         lock_time = cache.get('submit_locked', None)
         if lock_time is None:
-            return JsonResponse({"locked": False,
-                                 "error": False})
+            currentStatus = ({"locked": False, "error": False})
+            statusCode=200
         elif dsocEvent.objects.filter(event_time__gt=lock_time).exists():
             cache.delete('submit_locked')
-            return JsonResponse({'locked':False,
-                                 "error": False})
-        return JsonResponse({'locked':True,
-                             "error": False})
+            currentStatus = ({'locked':False, "error": False})
+            statusCode=200
+        else:
+            currentStatus = ({'locked':True, "error": False})
+            statusCode=503
     except Exception as e:
         logger.error(f"Cache unavailable while checking submit lock: {e}")
 
-        return JsonResponse({
-            "locked": True,
-            "error": True,
-            "message": "Unable to determine lock status."
-        }, status=503)
+        currentStatus = ({"locked": True, "error": True, "message": "Unable to determine lock status."})
+        statusCode=503
 
+    return JsonResponse(currentStatus, status = statusCode)
 
 def submit_waveform(request):
     if request.method == "POST":
@@ -208,29 +208,7 @@ def submit_waveform(request):
             event_time = timestamp
         )
 
-        # p = Path("../../../out/ngrok_endpoint.env")
-        # text = p.read_text().strip()
-
-        # bootstrap = None
-        # for line in text.splitlines():
-        #     if line.startswith("BOOTSTRAP_SERVER="):
-        #         bootstrap = line.split("=", 1)[1].strip()
-        #         break
-
-        # if not bootstrap:
-        #     raise RuntimeError("BOOTSTRAP_SERVER not found in /out/ngrok_endpoint.env")
-        
-        # bootstrap = ngrok_endpoint.objects.last().bootstrap
-
         topic, config = bootstrap(Stations.UI)
-
-        # Kafka version 
-        # topic = "user_input"
-        # config = {
-        #     "bootstrap.servers": bootstrap,
-        #     "message.max.bytes": 8388608,
-        #     "client.id": "ui-producer"}
-        # message = "User input a new waveform."
 
         def main():
             key = str(Message.UI_EVENT)
