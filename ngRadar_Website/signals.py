@@ -27,7 +27,7 @@ def create_obsevent_from_gbt(sender, instance, created, **kwargs):
         latency_ms=instance.latency_ms,
         station=Stations.GBT,      
         xmit_station=Stations.GBT, 
-        rcvr_station=Stations.HN,
+        rcvr_station=None,
         status=None,
         message=None,
     )
@@ -62,6 +62,11 @@ def create_obsevent_from_etransfer(sender, instance, created, **kwargs):
     if not created:
         return
 
+    if instance.station == Stations.DSOC:
+        rcvr = None
+    else:
+        rcvr = instance.station
+
     ObservatoryEvent.objects.create(
         object_id=instance.object_id,
         target=instance.target,
@@ -73,7 +78,7 @@ def create_obsevent_from_etransfer(sender, instance, created, **kwargs):
         latency_ms=instance.latency_ms,
         station=instance.station,
         xmit_station=Stations.GBT,
-        rcvr_station=Stations.HN,
+        rcvr_station=rcvr,
         transfer_uuid=instance.transfer_uuid,
         status=instance.status,
         message=instance.message,
