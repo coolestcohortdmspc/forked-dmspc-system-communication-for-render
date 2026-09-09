@@ -1,0 +1,4 @@
+Usage: uvicorn [OPTIONS] APP
+Try 'uvicorn --help' for help.
+
+Error: No such option '-p'.
