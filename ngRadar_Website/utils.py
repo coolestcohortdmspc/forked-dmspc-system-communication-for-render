@@ -592,7 +592,7 @@ def send_kafka_message(
         "filename": filename,
         "event_time": datetime.now(timezone.utc).isoformat(),
         "message": message,
-        "stations": stations.label,
+        "stations": stations,
     }
 
     produce(

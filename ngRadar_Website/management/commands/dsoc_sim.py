@@ -161,6 +161,7 @@ def verify_incoming_transfer(
 def track_etransfer_progress(payload, incoming_file: Path):
     transfer_uuid = payload["transfer_uuid"] # syntax?
     num_bytes = payload["num_bytes"] # make this an int?
+    stations = payload["stations"] # make this an int?
     received_bytes = 0
     write_transfer_progress( # resetting progress.json to zero so below logic doesn't read from previous run. Submit button does this too, but not on system-up :(
         received_bytes=0,
@@ -194,7 +195,7 @@ def track_etransfer_progress(payload, incoming_file: Path):
             break
 
         if time.monotonic() - last_progress_at > STALL_TIMEOUT_SECONDS:
-            if consumer_group_has_members(f"{Stations.HN.name.lower()}-consumer-group"):
+            if consumer_group_has_members(f"{stations.name.lower()}-consumer-group"):
                 # vlba is alive, the transfer is just slow. Start the clock over.
                 last_progress_at = time.monotonic()
             else:
@@ -218,6 +219,7 @@ def track_etransfer_progress(payload, incoming_file: Path):
 def process_msg(msg, producer_topic, producer_config):
     incoming_key = int(msg.key().decode("utf-8"))
     payload = json.loads(msg.value().decode("utf-8"))
+    station = payload["stations"]
     volume_folder = Path("/dsoc/incoming")
     
     if incoming_key == Message.VLBA_REQUEST_STORAGE.value:
@@ -229,7 +231,7 @@ def process_msg(msg, producer_topic, producer_config):
             record_transfer_event(
                 transfer_uuid=payload["transfer_uuid"],
                 gbt_uuid=payload["gbt_uuid"],
-                station=Stations.HN,
+                station=station,
                 status=Status.FAILED,
                 num_bytes=payload["num_bytes"],
                 message=payload["message"],
@@ -248,7 +250,7 @@ def process_msg(msg, producer_topic, producer_config):
                     record_transfer_event(
                         transfer_uuid=payload["transfer_uuid"],
                         gbt_uuid=payload["gbt_uuid"],
-                        station=Stations.HN,
+                        station=station,
                         status=Status.FAILED,
                         num_bytes=payload["num_bytes"],
                         message=f"DSOC does not have enough storage. Failed 15 times.",
@@ -261,7 +263,7 @@ def process_msg(msg, producer_topic, producer_config):
                         record_transfer_event(
                             transfer_uuid=payload["transfer_uuid"],
                             gbt_uuid=payload["gbt_uuid"],
-                            station=Stations.HN,
+                            station=station,
                             status=Status.RETRYING,
                             num_bytes=payload["num_bytes"],
                             message=f"DSOC does not have enough storage. Retrying...",
@@ -275,7 +277,7 @@ def process_msg(msg, producer_topic, producer_config):
                         status=payload["status"],
                         num_bytes=payload["num_bytes"],
                         filename=payload["filename"],
-                        stations=Stations.HN,
+                        stations=station,
                         message=payload["message"]+1,
                     )
                     print(f"DSOC does not have enough storage to accept the data transfer request. The remaining disk space is {space_remaining:0.2f}GB and the incoming data is {expected_num_bytes/1000000000:0.2f}GB")
@@ -286,10 +288,10 @@ def process_msg(msg, producer_topic, producer_config):
                     record_transfer_event(
                         transfer_uuid=payload["transfer_uuid"],
                         gbt_uuid=payload["gbt_uuid"],
-                        station=Stations.HN,
+                        station=station,
                         status=Status.READY,
                         num_bytes=payload["num_bytes"],
-                        message=f"DSOC made room to to accept the incoming data from {Stations.HN.label}",
+                        message=f"DSOC made room to to accept the incoming data from {station.label}",
                     )     
                     
                 send_kafka_message(
@@ -301,7 +303,7 @@ def process_msg(msg, producer_topic, producer_config):
                     status=payload["status"],
                     num_bytes=payload["num_bytes"],
                     filename=payload["filename"],
-                    stations=Stations.HN,
+                    stations=station,
                     message="Yes",
                 )
                 print("DSOC has enough storage to accept the incoming data. Awaiting e-transfer...")
@@ -318,7 +320,7 @@ def process_msg(msg, producer_topic, producer_config):
             record_transfer_event(
                 transfer_uuid=payload["transfer_uuid"],
                 gbt_uuid=payload["gbt_uuid"],
-                station=Stations.HN,
+                station=station,
                 status=Status.TRANSFERRED,
                 num_bytes=payload["num_bytes"],
                 message="Hancock VLBA e-transfer complete",
@@ -379,7 +381,7 @@ def process_msg(msg, producer_topic, producer_config):
                     num_bytes=image_num_bytes,
                     data=data,
                     xmit_station=Stations.GBT,
-                    rcvr_station=Stations.HN,
+                    rcvr_station=station,
                     transfer_uuid=payload["transfer_uuid"],
                 )
 
@@ -413,7 +415,7 @@ def process_msg(msg, producer_topic, producer_config):
             status=payload["status"],
             num_bytes=payload["num_bytes"],
             filename=payload["filename"],
-            stations=Stations.HN,
+            stations=station,
             message="Processing complete. Delete your raw data.",
         )
         
