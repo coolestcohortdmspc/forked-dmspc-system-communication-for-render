@@ -48,6 +48,7 @@ def test_process_msg_GBT_TX(
         mock_Path,
         mock_create
 ):
+    STATION = Stations.PT
     msg = MagicMock()
     msg.value.return_value = b'{"value"}'
     msg.key.return_value = b'5'
@@ -93,6 +94,7 @@ def test_process_msg_GBT_TX(
                     status=Status.READY,
                     num_bytes=500,
                     filename=mock_frame_path.name,
+                    stations=STATION,
                     message=1,
                 )
 

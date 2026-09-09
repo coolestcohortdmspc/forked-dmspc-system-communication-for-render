@@ -135,15 +135,13 @@ def test_config_func_GBT():
         }
 
 
-# @pytest.mark.parametrize("sim", [
-#         (Stations.SC),
-#         (Stations.HN),
-#         (Stations.FD)
-#     ])
-# NOTE: I want to make the code dynamically accept all VLBA stations, but that is a future project
-def test_config_func_VLBA():
+@pytest.mark.parametrize("sim", [
+        (Stations.SC),
+        (Stations.HN),
+        (Stations.FD)
+    ])
+def test_config_func_VLBA(sim):
     """Scenario 2: sim is a VLBA site"""
-    sim = Stations.HN
     bootstrap = "12345"
 
     producer_topic, producer_config, consumer_topic, consumer_config = config_func(sim, bootstrap)
@@ -1014,18 +1012,19 @@ def test_write_transfer_progress(
 @patch("ngRadar_Website.utils.ObservatoryEvent")
 def test_publish_status_obsEvents(mock_obs_event, mock_datetime):
     """Scenario 1: no errors"""
+    station=Stations.PT
     status="fake_status"
     msg="fake_msg"
 
     fake_datetime = MagicMock()
     mock_datetime.now.return_value = fake_datetime
 
-    publish_status_obsEvents(status, msg)
+    publish_status_obsEvents(station, status, msg)
 
     mock_datetime.now.assert_called_once_with(timezone.utc)
     mock_obs_event.objects.create.assert_called_once_with(object_id = 30104,
                                                           target = "Moretus",
-                                                          rcvr_station = Stations.HN,
+                                                          rcvr_station = station,
                                                           xmit_station = Stations.GBT,
                                                           event_time=fake_datetime, 
                                                           latency_ms=0.00, 
@@ -1036,6 +1035,7 @@ def test_publish_status_obsEvents(mock_obs_event, mock_datetime):
 @patch("ngRadar_Website.utils.ObservatoryEvent")
 def test_publish_status_obsEvents_error(mock_obs_event, mock_datetime, capsys):
     """Scenario 2: database error"""
+    station=Stations.PT
     status="fake_status"
     msg="fake_msg"
 
@@ -1044,14 +1044,14 @@ def test_publish_status_obsEvents_error(mock_obs_event, mock_datetime, capsys):
 
     mock_obs_event.objects.create.side_effect = Exception("Database error")
 
-    publish_status_obsEvents(status, msg)
+    publish_status_obsEvents(station, status, msg)
 
     captured=capsys.readouterr()
 
     mock_datetime.now.assert_called_once_with(timezone.utc)
     mock_obs_event.objects.create.assert_called_once_with(object_id = 30104,
                                                           target = "Moretus",
-                                                          rcvr_station = Stations.HN,
+                                                          rcvr_station = station,
                                                           xmit_station = Stations.GBT,
                                                           event_time=fake_datetime, 
                                                           latency_ms=0.00, 
