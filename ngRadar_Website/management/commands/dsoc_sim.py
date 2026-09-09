@@ -8,7 +8,6 @@ import numpy as np
 import io
 from ngRadar_Website.models.models import gbtEvent, dsocEvent, ETransferEvent
 from ngRadar_Website.enums import Stations, Status, Message
-# from ngRadar_Website.utils import latency_calc, bootstrap, consume, create_s3_client, upload_seaweedfs, write_transfer_progress, send_kafka_message, get_folder_size
 from ngRadar_Website.utils import *
 from pathlib import Path
 import json
@@ -276,6 +275,7 @@ def process_msg(msg, producer_topic, producer_config):
                         status=payload["status"],
                         num_bytes=payload["num_bytes"],
                         filename=payload["filename"],
+                        stations=Stations.HN,
                         message=payload["message"]+1,
                     )
                     print(f"DSOC does not have enough storage to accept the data transfer request. The remaining disk space is {space_remaining:0.2f}GB and the incoming data is {expected_num_bytes/1000000000:0.2f}GB")
@@ -301,6 +301,7 @@ def process_msg(msg, producer_topic, producer_config):
                     status=payload["status"],
                     num_bytes=payload["num_bytes"],
                     filename=payload["filename"],
+                    stations=Stations.HN,
                     message="Yes",
                 )
                 print("DSOC has enough storage to accept the incoming data. Awaiting e-transfer...")
@@ -412,6 +413,7 @@ def process_msg(msg, producer_topic, producer_config):
             status=payload["status"],
             num_bytes=payload["num_bytes"],
             filename=payload["filename"],
+            stations=Stations.HN,
             message="Processing complete. Delete your raw data.",
         )
         

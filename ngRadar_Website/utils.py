@@ -71,24 +71,25 @@ def config_func(sim, bootstrap):
     """
 
     # determine the type of sim being used - each one has unique kafka topics:
-    if sim in [Stations.GBT, Stations.HN, Stations.DSOC]:
+    if sim == Stations.GBT:
+        # GBT consumes from UI, produces to GBT
         type = "producer and consumer"
-        if sim == Stations.GBT:
-            # GBT consumes from UI, produces to GBT
-            topic1 = ["user_input"]
-            topic2 = "GBT_data"
-        elif sim == Stations.HN:
-            # VLBA consumes from GBT and DSOC, produces to DSOC
-            topic1 = ["GBT_data", "DSOC_notif"]
-            topic2 = "VLBA_notif"
-        elif sim == Stations.DSOC:
-            # DSOC is now consuming from and producing to VLBA
-            topic1 = ["VLBA_notif"]  #consumes from the GBT's topic
-            topic2 = "DSOC_notif"
-    else:  # sim == Stations.UI:
+        topic1 = ["user_input"]
+        topic2 = "GBT_data"
+    elif sim == Stations.DSOC:
+        # DSOC is now consuming from and producing to VLBA
+        type = "producer and consumer"
+        topic1 = ["VLBA_notif"]  #consumes from the GBT's topic
+        topic2 = "DSOC_notif"
+    elif sim == Stations.UI:
         # UI produces to UI topic
         type = "producer"
         topic = "user_input"
+    else: # sim == VLBA station
+        # VLBA consumes from GBT and DSOC, produces to DSOC
+        type = "producer and consumer"
+        topic1 = ["GBT_data", "DSOC_notif"]
+        topic2 = "VLBA_notif"
 
     # perform the shared behavior for each type:
     if type == "producer and consumer":
@@ -142,26 +143,7 @@ def bootstrap(sim):
     """
     load_dotenv()  # Load environment variables from .env file
 
-    # p = Path("../../../../out/ngrok_endpoint.env")
-    # text = p.read_text().strip()
-
-    # bootstrap = None
-    # for line in text.splitlines():
-    #     if line.startswith("BOOTSTRAP_SERVER="):
-    #         bootstrap = line.split("=", 1)[1].strip()
-    #         break
-
-    # if not bootstrap:
-    #     raise RuntimeError("BOOTSTRAP_SERVER not found in /out/ngrok_endpoint.env")
-
     bootstrap = os.getenv("BOOTSTRAP_SERVER", "kafka-broker:29092")
-    
-    # if sim != Stations.DSOC:
-    #     producer_topic, producer_config, consumer_topic, consumer_config = config_func(sim, bootstrap)
-    #     return producer_topic, producer_config, consumer_topic, consumer_config
-    # else:
-    #     topic, config = config_func(sim, bootstrap)
-    #     return topic, config
 
     return config_func(sim, bootstrap)
     
@@ -599,8 +581,8 @@ def send_kafka_message(
     status,
     num_bytes,
     filename,
+    stations,
     message="",
-    stations=Stations.HN,
 ):
     payload = {
         "transfer_uuid": str(transfer_uuid),
@@ -621,7 +603,7 @@ def send_kafka_message(
     )
 
     
-def create_file(file_path, file_mb=200):
+def create_file(file_path, file_mb=20):
     file_size_bytes = file_mb * 1024 * 1024
     num_buffers = 100
 
