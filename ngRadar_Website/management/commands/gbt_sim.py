@@ -1,91 +1,177 @@
 from datetime import datetime, timezone
+
+import json
 import time
+import uuid
+
 from django.core.management.base import BaseCommand
+
 from ngRadar_Website.enums import Stations, Message
-from ngRadar_Website.models.models import uiEvent
-from ngRadar_Website.models.models import gbtEvent
-from ngRadar_Website.utils import latency_calc, bootstrap, consume, produce
+from ngRadar_Website.utils import (
+    latency_calc,
+    bootstrap,
+    consume,
+    produce,
+)
 
 
-# payload that will be inserted in the gbtEvent db table
-payload = {
-    "object_id": None, 
-    "target": None, 
-    "tx_waveform": None, 
-    "rec_waveform": None, 
-    "event_time": None, 
-    "latency_ms": None,
-}
-
-def set_payload_dict(waveform, event_time):
-    payload["object_id"] = '30104'
-    payload["target"] = 'Moretus'
-    payload["tx_waveform"] = waveform
-    payload["rec_waveform"] = waveform
-    payload["event_time"] = datetime.now(timezone.utc)
-    payload["latency_ms"] = latency_calc(event_time, Stations.GBT)
-
-    return payload
-
-
-def generate_payload(ui_event_uuid):
-    ui_event = uiEvent.objects.get(uuid=ui_event_uuid)
-
-    payload = set_payload_dict(ui_event.selected_waveform, ui_event.event_time)
-
-    return payload
+def set_payload_dict(
+    waveform,
+    ui_event_time,
+):
+    return {
+        "object_id": "30104",
+        "target": "Moretus",
+        "tx_waveform": waveform,
+        "rec_waveform": waveform,
+        "event_time": datetime.now(
+            timezone.utc
+        ),
+        "latency_ms": latency_calc(
+            ui_event_time,
+            Stations.GBT,
+        ),
+    }
 
 
 def turn_off_transmitter():
-    gbtEvent.objects.create(
-        **
-        {
-            "object_id": '30104', 
-            "target": 'Moretus', 
-            "tx_waveform": 'Tx_OFF', 
-            "rec_waveform": 'Tx_OFF', 
-            "event_time": datetime.now(timezone.utc), 
-            "latency_ms": 0,
-        }
-    )
+    print("GBT transmitter OFF")
     time.sleep(5)
 
 
-def publish_gbtEvents(payload):
-    gbt_event = gbtEvent.objects.create(**payload)
+def process_msg(
+    msg,
+    producer_topic,
+    producer_config,
+):
+    incoming_key = int(
+        msg.key().decode("utf-8")
+    )
 
-    return gbt_event.uuid
+    if incoming_key != Message.UI_EVENT.value:
+        return True
 
+    payload = json.loads(
+        msg.value().decode("utf-8")
+    )
 
-def process_msg(msg, producer_topic, producer_config):
-    ui_uuid = msg.value().decode("utf-8")  # this is the uuid of the ui_event
+    waveform = payload["tx_waveform"]
 
-    # turn off the transmitter for 5 seconds
+    ui_event_time = datetime.fromisoformat(
+        payload["event_time"]
+    )
+
+    print(
+        f"GBT received waveform request: "
+        f"{waveform}"
+    )
+
     turn_off_transmitter()
 
-    # fill in the values to be published to the db
-    payload = generate_payload(ui_uuid)
+    gbt_payload = set_payload_dict(
+        waveform,
+        ui_event_time,
+    )
 
-    # publish new transmission to the db
-    gbt_uuid = publish_gbtEvents(payload)
+    # Correlates the whole observation sequence.
+    gbt_uuid = uuid.uuid4()
 
-    key, value = f"{Message.GBT_TX}", f"{gbt_uuid}"
+    # Uniquely identifies this specific
+    # ObservatoryEvent.
+    event_uuid = uuid.uuid4()
 
-    # produce this new message, lets DSOC know to produce image(s)
-    produce(producer_topic, producer_config, key, value)
+    kafka_payload = {
+        "event_uuid": str(event_uuid),
+
+        "gbt_uuid": str(gbt_uuid),
+
+        "transfer_uuid": None,
+
+        "station": int(Stations.GBT),
+        "station_name": Stations.GBT.label,
+
+        "object_id": gbt_payload[
+            "object_id"
+        ],
+        "target": gbt_payload[
+            "target"
+        ],
+
+        "tx_waveform": gbt_payload[
+            "tx_waveform"
+        ],
+        "rec_waveform": gbt_payload[
+            "rec_waveform"
+        ],
+
+        "product_type": None,
+        "product_id": None,
+
+        "status": None,
+
+        "xmit_station": int(
+            Stations.GBT
+        ),
+        "rcvr_station": None,
+
+        "image_key": None,
+        "num_bytes": 0,
+
+        "latency_ms": gbt_payload[
+            "latency_ms"
+        ],
+
+        "message": (
+            f"GBT transmitting waveform "
+            f"{waveform}."
+        ),
+
+        "event_time": (
+            gbt_payload["event_time"]
+            .isoformat()
+        ),
+        "gbt_event_time": (
+            gbt_payload["event_time"]
+            .isoformat()
+        ),
+    }
+
+    produce(
+        producer_topic,
+        producer_config,
+        str(Message.GBT_TX.value),
+        json.dumps(kafka_payload),
+    )
+
+    print(
+        f"GBT published event "
+        f"{event_uuid}"
+    )
+
+    return True
 
 
 class Command(BaseCommand):
     help = "Runs the GBT simulator"
 
-    def handle(self, *args, **options):
+    def handle(
+        self,
+        *args,
+        **options,
+    ):
         print("Starting GBT simulator")
-        #time.sleep(10)
-        producer_topic, producer_config, consumer_topic, consumer_config = bootstrap(Stations.GBT)
 
-        # generate a dummy data payload, publish this data to the db, produce a message with this payload, then start consuming
-        payload = set_payload_dict('W48', -1)
-        gbt_uuid = publish_gbtEvents(payload)
-        key, value = f"{Message.GBT_TX}", f"{gbt_uuid}"
-        produce(producer_topic, producer_config, key, value)
-        consume(consumer_topic, consumer_config, process_msg, producer_topic=producer_topic, producer_config=producer_config)
+        (
+            producer_topic,
+            producer_config,
+            consumer_topic,
+            consumer_config,
+        ) = bootstrap(Stations.GBT)
+
+        consume(
+            consumer_topic,
+            consumer_config,
+            process_msg,
+            producer_topic=producer_topic,
+            producer_config=producer_config,
+        )

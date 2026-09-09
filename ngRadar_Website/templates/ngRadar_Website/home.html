@@ -1,5 +1,5 @@
 {% extends 'ngRadar_Website/base.html' %}
-
+{% load static %}
 {% block title %}Home{% endblock %}
 
 {% block content %}
@@ -9,20 +9,18 @@
     <div class="fs-5">
         <strong style="font-weight: 700 !important;">Current Time in UTC:</strong> <span id="live-clock"></span>
     </div>
-    <!-- JS for the live clock -->
-    <script src="../../static/ngRadar_Website/js/home_live_clock_script.js"></script>
 </div>
   
 
 <!-- Row 2: Obs Status & Input Waveform -->
 <div class="row justify-content-center g-3 mb-4">
     <!-- Obs Status -->
-    <div id="home-status-partial" 
-        hx-get="{% url 'status' %}" 
-        hx-trigger="every 1s" 
-        hx-target="#home-status-partial"
-        class="col-12 col-md-6 col-lg-5">
-        {% include 'ngRadar_Website/partials/status_partial.html' %}
+    <div
+        id="status"
+        class="col-12 col-md-6 col-lg-5"
+        hx-get="{% url 'status' %}"
+        hx-trigger="load, statusChanged from:body"
+        hx-swap="innerHTML">
     </div>
       
     <!-- Input Waveform -->
@@ -52,37 +50,50 @@
     </div>
 </div>
 
-<!-- Row 3: HTMX GBT Partial - HTMX: 1 second refresh -->
-<div id="home-gbt-partial" 
-     hx-get="{% url 'gbt_events' %}" 
-     hx-trigger="every 1s" 
-     hx-target="#home-gbt-partial"
-     class="w-100 mb-4">
-    {% include 'ngRadar_Website/partials/gbt_home_partial.html' %}
+<!-- GBT -->
+<div
+    id="home-gbt-partial"
+    class="w-100 mb-4"
+    hx-get="{% url 'gbt_events' %}"
+    hx-trigger="load, gbtChanged from:body"
+    hx-swap="innerHTML">
 </div>
 
-<div id="progress_bar_partial"
-    class="w-100 mb-4"></div>
+
+<!-- Progress -->
+<div
+    id="progress_bar_partial"
+    class="w-100 mb-4">
     {% include 'ngRadar_Website/partials/progress_bar_partial.html' %}
 </div>
 
 
-<!-- Row 4: DSOC Partial - HTMX: 1 second refresh -->
-<div id="home-dsoc-partial" 
-     hx-get="{% url 'dsoc_events' %}" 
-     hx-trigger="every 5s" 
-     hx-target="#home-dsoc-partial"
-     class="w-100">
-    {% include 'ngRadar_Website/partials/dsoc_home_partial.html' %}
+<!-- DSOC -->
+<div
+    id="home-dsoc-partial"
+    class="w-100"
+    hx-get="{% url 'dsoc_events' %}"
+    hx-trigger="load, dsocChanged from:body"
+    hx-swap="innerHTML">
 </div>
 
-
 <script>
-    window.addEventListener('pageshow', function(event){
-        if(event.persisted){
-            window.location.reload()
+    window.addEventListener(
+        "pageshow",
+        function(event) {
+            if (event.persisted) {
+                window.location.reload();
+            }
         }
-    });
+    );
 </script>
+
+{% endblock %}
+
+
+{% block scripts %}
+
+<script src="{% static 'ngRadar_Website/js/home_live_clock_script.js' %}"></script>
+<script src="{% static 'ngRadar_Website/js/home_events.js' %}"></script>
 
 {% endblock %}

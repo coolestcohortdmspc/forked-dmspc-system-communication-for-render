@@ -5,8 +5,10 @@ from django.shortcuts import redirect, render, get_object_or_404
 from django.views.decorators.cache import cache_control
 from django.views.decorators.http import require_POST, require_GET
 
-#libraries used for data streaming
+# For SSE streaming
 from django.http import StreamingHttpResponse, JsonResponse, HttpResponse, HttpResponseNotFound
+import asyncio
+from ngRadar_Website.sse import sse_broker
 
 # serve_image imports
 from ngRadar_Website.utils import create_s3_client, bootstrap, write_transfer_progress, produce, publish_status_obsEvents # , get_presigned_url
@@ -15,16 +17,13 @@ from ngRadar_Website.enums import Stations, Message, Status
 #libraries used for lock status
 from django.core.cache import cache
 
-from ngRadar_Website.models.models import ObservatoryEvent, uiEvent, gbtEvent, dsocEvent, ETransferEvent
-from ngRadar_Website.models.models import ObservatoryEvent, uiEvent, gbtEvent, dsocEvent, ETransferEvent
+from ngRadar_Website.models.models import ObservatoryEvent
 from django.contrib import messages
 from django.contrib.auth import authenticate, login, logout, logout
 from django.db.models import Avg
 from datetime import datetime, timezone
 import logging
-
 from ngRadar_Website.utils import produce
-
 import json, uuid, os, time
 
 
@@ -74,6 +73,64 @@ def get_obs_events():
         'latest_etr_event': latest_etr_event,
         'latest_image_event': latest_image_event,
     }
+
+
+async def sse_stream(request):
+    subscriber = sse_broker.subscribe()
+    _, queue = subscriber
+
+    async def event_generator():
+        try:
+            # Tell EventSource to wait 3 seconds before reconnecting
+            # after a dropped connection.
+            yield "retry: 3000\n\n"
+
+            while True:
+                try:
+                    event = await asyncio.wait_for(
+                        queue.get(),
+                        timeout=15,
+                    )
+
+                    event_type = event["type"]
+                    event_data = event.get("data", {})
+
+                    yield (
+                        f"event: {event_type}\n"
+                        f"data: {json.dumps(event_data)}\n\n"
+                    )
+
+                except asyncio.TimeoutError:
+                    # Nothing came from Kafka for 15 seconds.
+                    # Keep the HTTP connection alive.
+                    heartbeat = {
+                        "timestamp": (
+                            datetime.now(timezone.utc)
+                            .isoformat()
+                        )
+                    }
+
+                    yield (
+                        "event: heartbeat\n"
+                        f"data: {json.dumps(heartbeat)}\n\n"
+                    )
+
+        except asyncio.CancelledError:
+            # Browser closed/reloaded/navigated away.
+            raise
+
+        finally:
+            sse_broker.unsubscribe(subscriber)
+
+    response = StreamingHttpResponse(
+        event_generator(),
+        content_type="text/event-stream",
+    )
+
+    response["Cache-Control"] = "no-cache"
+    response["X-Accel-Buffering"] = "no"
+
+    return response
 
 
 def get_Message_Latency():
@@ -198,50 +255,61 @@ def lock_status(request):
 
 def submit_waveform(request):
     if request.method == "POST":
-        uuid_input = uuid.uuid4()
-        waveform  = request.POST.get('waveform')
+        event_uuid = uuid.uuid4()
+        waveform = request.POST.get("waveform")
         timestamp = datetime.now(timezone.utc)
-        # Database version
-        ui_Event = uiEvent.objects.create(
-            uuid = uuid_input,
-            selected_waveform = waveform,
-            event_time = timestamp
-        )
-
-        # p = Path("../../../out/ngrok_endpoint.env")
-        # text = p.read_text().strip()
-
-        # bootstrap = None
-        # for line in text.splitlines():
-        #     if line.startswith("BOOTSTRAP_SERVER="):
-        #         bootstrap = line.split("=", 1)[1].strip()
-        #         break
-
-        # if not bootstrap:
-        #     raise RuntimeError("BOOTSTRAP_SERVER not found in /out/ngrok_endpoint.env")
-        
-        # bootstrap = ngrok_endpoint.objects.last().bootstrap
 
         topic, config = bootstrap(Stations.UI)
 
-        # Kafka version 
-        # topic = "user_input"
-        # config = {
-        #     "bootstrap.servers": bootstrap,
-        #     "message.max.bytes": 8388608,
-        #     "client.id": "ui-producer"}
-        # message = "User input a new waveform."
+        payload = {
+            "event_uuid": str(event_uuid),
+            "gbt_uuid": None,
+            "transfer_uuid": None,
 
-        def main():
-            key = str(Message.UI_EVENT)
-            value = uuid_input.hex  # Use the UUID as the value for the Kafka message
-            produce(topic, config, key, value)
-            write_transfer_progress(received_bytes=0, total_bytes=0, percent=0.0, transfer_id=0)  # Reset the progress bar after sending the message
-        main()
-        
-        # add a cache for submit time
-        cache.set('submit_locked', datetime.now(timezone.utc))
-    return redirect('home')
+            "station": int(Stations.UI),
+            "station_name": Stations.UI.label,
+
+            "tx_waveform": waveform,
+            "rec_waveform": waveform,
+
+            "status": None,
+            "object_id": None,
+            "target": None,
+
+            "xmit_station": None,
+            "rcvr_station": None,
+
+            "num_bytes": 0,
+            "latency_ms": 0.0,
+            "image_key": None,
+
+            "message": (
+                f"User submitted waveform {waveform}."
+            ),
+
+            "event_time": timestamp.isoformat(),
+        }
+
+        produce(
+            topic,
+            config,
+            str(Message.UI_EVENT.value),
+            json.dumps(payload),
+        )
+
+        write_transfer_progress(
+            received_bytes=0,
+            total_bytes=0,
+            percent=0.0,
+            transfer_id=0,
+        )
+
+        cache.set(
+            "submit_locked",
+            datetime.now(timezone.utc),
+        )
+
+    return redirect("home")
 
 #====================================================
 # Render the templates

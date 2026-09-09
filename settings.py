@@ -41,20 +41,36 @@ INSTALLED_APPS = [
     'ngRadar_Website.apps.apps.NgradarWebAppConfig',
 ]
 
+# MIDDLEWARE = [
+#     # the order of these is VERY important. 
+#     # if making changes, ensure the order is correct
+#     "ngRadar_Website.middleware.DatabaseUnavailableMiddleware",
+#     'django.middleware.security.SecurityMiddleware',
+#     'whitenoise.middleware.WhiteNoiseMiddleware',
+#     'django.contrib.sessions.middleware.SessionMiddleware',
+#     'django.middleware.common.CommonMiddleware',
+#     'django.middleware.csrf.CsrfViewMiddleware',
+#     'django.contrib.auth.middleware.AuthenticationMiddleware',
+#     'django.contrib.messages.middleware.MessageMiddleware',
+#     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+#     'login_required.middleware.LoginRequiredMiddleware',
+#     'ngRadar_Website.robots.RobotsMiddleware', 
+# ]
+
 MIDDLEWARE = [
     # the order of these is VERY important. 
     # if making changes, ensure the order is correct
+    "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "ngRadar_Website.middleware.DatabaseUnavailableMiddleware",
-    'django.middleware.security.SecurityMiddleware',
-    'whitenoise.middleware.WhiteNoiseMiddleware',
-    'django.contrib.sessions.middleware.SessionMiddleware',
-    'django.middleware.common.CommonMiddleware',
-    'django.middleware.csrf.CsrfViewMiddleware',
-    'django.contrib.auth.middleware.AuthenticationMiddleware',
-    'django.contrib.messages.middleware.MessageMiddleware',
-    'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'login_required.middleware.LoginRequiredMiddleware',
-    'ngRadar_Website.robots.RobotsMiddleware', 
+    "django.contrib.sessions.middleware.SessionMiddleware",
+    "django.middleware.common.CommonMiddleware",
+    "django.middleware.csrf.CsrfViewMiddleware",
+    "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "django.contrib.messages.middleware.MessageMiddleware",
+    "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "django.contrib.auth.middleware.LoginRequiredMiddleware",
+    "ngRadar_Website.robots.RobotsMiddleware",
 ]
 
 PASSWORD_HASHERS = [

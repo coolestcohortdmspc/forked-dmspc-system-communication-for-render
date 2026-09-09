@@ -77,8 +77,14 @@
   </script>
 
 
-   <!-- Initialize Bootstrap tooltips -->
-  <script src="../../static/ngRadar_Website/js/base_tooltip_script.js"></script>
+  <script src="{% static 'ngRadar_Website/js/base_tooltip_script.js' %}"></script>
+
+  <!-- Shared SSE connection.
+      This MUST load before page-specific SSE listeners. -->
+  <script src="{% static 'ngRadar_Website/js/base_sse.js' %}"></script>
+
+  {% block scripts %}
+  {% endblock %}
 
 </body>
 </html>
