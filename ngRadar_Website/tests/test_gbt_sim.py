@@ -165,4 +165,4 @@ def test_process_msg(mock_produce, mock_publish_DB, mock_gen_payload, mock_trans
     mock_transmitter.assert_called_once()
     mock_gen_payload.assert_called_once_with("12345")
     mock_publish_DB.assert_called_once_with(payload)
-    mock_produce.assert_called_once_with("topic", "config", f"{Message.GBT_TX}", "gbt_uuid")
+    mock_produce.assert_called_once_with(Stations.GBT,"topic", "config", f"{Message.GBT_TX}", "gbt_uuid")

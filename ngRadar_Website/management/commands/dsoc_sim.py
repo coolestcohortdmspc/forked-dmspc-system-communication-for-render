@@ -292,7 +292,7 @@ def process_msg(msg, producer_topic, producer_config):
                         station=station,
                         status=Status.READY,
                         num_bytes=payload["num_bytes"],
-                        message=f"DSOC made room to to accept the incoming data from {station.label}",
+                        message=f"DSOC made room to to accept the incoming data from {station}",
                     )     
                     
                 send_kafka_message(

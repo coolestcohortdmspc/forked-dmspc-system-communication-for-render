@@ -315,12 +315,13 @@ def test_consume_exception(mock_publish, mock_Consumer):
 
     #call the function to use our fake values:
     with pytest.raises(RuntimeError):
-        consume("topic", "config", mock_process_msg)
+        consume(Stations.GBT, "topic", "config", mock_process_msg)
 
     mock_Consumer.assert_called_once_with("config")
     mock_consumer.subscribe.assert_called_once_with("topic")
     mock_process_msg.assert_called_once_with(mock_msg, None, None)
     mock_publish.assert_called_once_with(
+            station=Stations.GBT,
             status=Status.FAILED,
             msg="Failed to connect to Kafka!",
         )
@@ -341,12 +342,13 @@ def test_consume_error(mock_publish, mock_Consumer):
     mock_msg.error.return_value = "fake_error"
 
     #call the function to use our fake values:
-    consume("topic", "config", mock_process_msg)
+    consume(Stations.GBT, "topic", "config", mock_process_msg)
 
     mock_Consumer.assert_called_once_with("config")
     mock_consumer.subscribe.assert_called_once_with("topic")
     mock_process_msg.assert_not_called()
     mock_publish.assert_called_once_with(
+            station=Stations.GBT,
             status=Status.FAILED,
             msg="Failed to connect to Kafka.",
         )
@@ -368,12 +370,13 @@ def test_consume_manual(mock_publish, mock_Consumer):
 
     mock_config = MagicMock()
     #call the function to use our fake values:
-    consume("topic", mock_config, mock_process_msg, manual_commit=True)
+    consume(Stations.DSOC, "topic", mock_config, mock_process_msg, manual_commit=True)
 
     mock_Consumer.assert_called_once_with({'enable.auto.commit': False})
     mock_consumer.subscribe.assert_called_once_with("topic")
     mock_process_msg.assert_not_called()
     mock_publish.assert_called_once_with(
+            station=Stations.DSOC,
             status=Status.FAILED,
             msg="Failed to connect to Kafka.",
         )
@@ -402,16 +405,17 @@ def test_consume_partition_error(mock_publish, mock_Consumer, capsys):
 
     #call the function to use our fake values:
     with pytest.raises(RuntimeError):
-        consume("topic", "config", mock_process_msg)
+        consume(Stations.PT, "topic", "config", mock_process_msg)
 
     captured = capsys.readouterr()
 
     mock_Consumer.assert_called_once_with("config")
     mock_consumer.subscribe.assert_called_once_with("topic")
     mock_publish.assert_called_once_with(
-                    status=Status.FAILED,
-                    msg="Failed to connect to Kafka!",
-                )
+            station=Stations.PT,
+            status=Status.FAILED,
+            msg="Failed to connect to Kafka!",
+        )
     assert captured.out.strip() == "Consumer reached partition EOF"
 
 # ==============================================================================
@@ -476,7 +480,7 @@ def test_create_s3_client_success(mock_Config, mock_ensure_bucket, mock_boto3):
     config_value = "fake_config"
     mock_Config.return_value = config_value
 
-    s3_client = create_s3_client()
+    s3_client = create_s3_client(station=Stations.DSOC)
 
     assert s3_client == mock_s3
     mock_boto3.assert_called_once_with(
@@ -519,7 +523,7 @@ def test_create_s3_client_connection_error(mock_publish, mock_Config, mock_ensur
     mock_sleep.return_value = None
 
     with pytest.raises(RuntimeError) as exc_info:
-        s3_client = create_s3_client()
+        s3_client = create_s3_client(Stations.GBT)
 
     assert mock_sleep.call_count == 3
     mock_boto3.assert_called_once_with(
@@ -538,10 +542,12 @@ def test_create_s3_client_connection_error(mock_publish, mock_Config, mock_ensur
     second = mock_publish.call_args_list[1]
     assert mock_publish.call_count == 3
     assert first.kwargs == {
+        "station": Stations.GBT,
         "status": Status.POLLING,
         "msg": f"Waiting for SeaweedFS... ({0 + 1}/3)",
     }
     assert second.kwargs == {
+            "station": Stations.GBT,
             "status": Status.POLLING,
             "msg": f"Waiting for SeaweedFS... ({1 + 1}/3)",
         }
@@ -572,7 +578,7 @@ def test_create_s3_client_client_error(mock_Config, mock_ensure_bucket, mock_bot
     mock_Config.return_value = config_value
 
    
-    s3_client = create_s3_client()
+    s3_client = create_s3_client(station=Stations.PT)
 
     assert s3_client == mock_s3
     mock_boto3.assert_called_once_with(
@@ -750,7 +756,7 @@ def test_produce(mock_Producer):
     mock_producer = mock_Producer.return_value
     mock_producer.flush.return_value = 0
 
-    result = produce(topic, config, key, value)
+    result = produce(Stations.GBT, topic, config, key, value)
 
     assert result == True
     mock_Producer.assert_called_once_with(config)
@@ -775,13 +781,13 @@ def test_produce_delivery_error(mock_publish, mock_Producer):
 
     mock_producer.produce.side_effect = produce_side_effect
 
-    result = produce(topic, config, key, value)
+    result = produce(Stations.DSOC, topic, config, key, value)
 
     assert result == False
     mock_Producer.assert_called_once_with(config)
     mock_producer.produce.assert_called_once_with(topic, key=key, value=value, callback=mock_producer.produce.call_args.kwargs["callback"])
     mock_producer.flush.assert_called_once_with(2)
-    mock_publish.assert_called_once_with(status=Status.FAILED, msg="Delivery failed")
+    mock_publish.assert_called_once_with(station=Stations.DSOC, status=Status.FAILED, msg="Delivery failed")
 
 @patch("ngRadar_Website.utils.Producer")
 @patch("ngRadar_Website.utils.publish_status_obsEvents")
@@ -795,13 +801,13 @@ def test_produce_delivery_flush_error(mock_publish, mock_Producer):
     mock_producer = mock_Producer.return_value
     mock_producer.flush.return_value = 1
 
-    result = produce(topic, config, key, value)
+    result = produce(Stations.PT, topic, config, key, value)
 
     assert result == False
     mock_Producer.assert_called_once_with(config)
     mock_producer.produce.assert_called_once_with(topic, key=key, value=value, callback=mock_producer.produce.call_args.kwargs["callback"])
     mock_producer.flush.assert_called_once_with(2)
-    mock_publish.assert_called_once_with(status=Status.FAILED, msg="Kafka broker did not respond.")
+    mock_publish.assert_called_once_with(station=Stations.PT, status=Status.FAILED, msg="Kafka broker did not respond.")
 
 @patch("ngRadar_Website.utils.Producer")
 @patch("ngRadar_Website.utils.publish_status_obsEvents")
@@ -817,13 +823,13 @@ def test_produce_delivery_exception(mock_publish, mock_Producer):
 
     mock_producer.produce.side_effect = Exception("Kafka Exception")
 
-    result = produce(topic, config, key, value)
+    result = produce(Stations.HN, topic, config, key, value)
 
     assert result == False
     mock_Producer.assert_called_once_with(config)
     mock_producer.produce.assert_called_once_with(topic, key=key, value=value, callback=mock_producer.produce.call_args.kwargs["callback"])
     mock_producer.flush.assert_not_called()
-    mock_publish.assert_called_once_with(status=Status.FAILED, msg="Failed to send Kafka message: Kafka Exception")
+    mock_publish.assert_called_once_with(station=Stations.HN, status=Status.FAILED, msg="Failed to send Kafka message: Kafka Exception")
 
 
 # ==============================================================================
@@ -880,6 +886,7 @@ def test_send_kafka_message(mock_datetime, mock_produce):
     status=Status.TRANSFERRING
     num_bytes=2048
     filename="mock.filename"
+    stations=Stations.GBT
     message=1
 
     mock_produce.return_value = None
@@ -897,10 +904,12 @@ def test_send_kafka_message(mock_datetime, mock_produce):
         status=status,
         num_bytes=num_bytes,
         filename=filename, 
+        stations=stations,
         message=message,
     )
 
     mock_produce.assert_called_once_with(
+        stations,
         producer_topic,
         producer_config,
         key,

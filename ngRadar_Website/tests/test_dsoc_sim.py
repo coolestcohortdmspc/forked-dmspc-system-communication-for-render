@@ -168,7 +168,7 @@ def test_save_image_to_seaweedfs_success(mock_upload, mock_s3):
 @patch("ngRadar_Website.management.commands.dsoc_sim.create_s3_client")
 @patch("ngRadar_Website.management.commands.dsoc_sim.publish_status_obsEvents")
 def test_save_image_to_seaweedfs_error(mock_publish, mock_s3):
-    """Scenario 2: """
+    """Scenario 2: error"""
     #function inputs:
     target = "Venus"
     image_file = b"fake png bytes"
@@ -181,6 +181,7 @@ def test_save_image_to_seaweedfs_error(mock_publish, mock_s3):
     assert output == False
     mock_s3.assert_called_once()
     mock_publish.assert_called_once_with(
+            station=Stations.DSOC,
             status=Status.FAILED,
             msg="Failed to connect to SeaweedFS.",
         )
@@ -281,10 +282,10 @@ def test_process_msg_VLBA_REQUEST_STORAGE(
     mock_record_transfer_event.assert_called_once_with(
                                 transfer_uuid="11111111-1111-1111-1111-111111111111",
                                 gbt_uuid="22222222-2222-2222-2222-222222222222",
-                                station=Stations.HN,
+                                station=str("fake_station"),
                                 status=Status.READY,
                                 num_bytes=2048,
-                                message=f"DSOC made room to to accept the incoming data from {Stations.HN.label}",
+                                message=f"DSOC made room to to accept the incoming data from fake_station",
                             )     
     mock_send_kafka_message.assert_called_once_with(
                             key = f"{Message.DSOC_RESPOND_STORAGE}", 
@@ -295,6 +296,7 @@ def test_process_msg_VLBA_REQUEST_STORAGE(
                             status=1,
                             num_bytes=2048,
                             filename="fake_filename.png",
+                            stations=str("fake_station"),
                             message="Yes",
                         )
 #=====================================================================
@@ -350,7 +352,7 @@ def test_process_msg_VLBA_REQUEST_STORAGE_FAILED(
     mock_record_transfer_event.assert_called_once_with(
                                 transfer_uuid="11111111-1111-1111-1111-111111111111",
                                 gbt_uuid="22222222-2222-2222-2222-222222222222",
-                                station=Stations.HN,
+                                station=str("fake_station"),
                                 status=Status.FAILED,
                                 num_bytes=2048,
                                 message=2,
@@ -411,7 +413,7 @@ def test_process_msg_VLBA_REQUEST_STORAGE_15(
     mock_record_transfer_event.assert_called_once_with(
                                 transfer_uuid="11111111-1111-1111-1111-111111111111",
                                 gbt_uuid="22222222-2222-2222-2222-222222222222",
-                                station=Stations.HN,
+                                station=str("fake_station"),
                                 status=Status.FAILED,
                                 num_bytes=2048,
                                 message=f"DSOC does not have enough storage. Failed 15 times.",
@@ -472,7 +474,7 @@ def test_process_msg_VLBA_REQUEST_STORAGE_1(
     mock_record_transfer_event.assert_called_once_with(
                             transfer_uuid="11111111-1111-1111-1111-111111111111",
                             gbt_uuid="22222222-2222-2222-2222-222222222222",
-                            station=Stations.HN,
+                            station=str("fake_station"),
                             status=Status.RETRYING,
                             num_bytes=2048,
                             message=f"DSOC does not have enough storage. Retrying...",
@@ -486,6 +488,7 @@ def test_process_msg_VLBA_REQUEST_STORAGE_1(
                             status=1,
                             num_bytes=2048,
                             filename="fake_filename.png",
+                            stations=str("fake_station"),
                             message=2,
                         )
 
@@ -594,7 +597,7 @@ def test_process_msg_VLBA_TRANSFERRING(
                     num_bytes=500,
                     data=mock_data,
                     xmit_station=Stations.GBT,
-                    rcvr_station=Stations.HN,
+                    rcvr_station="fake_station",
                     transfer_uuid="11111111-1111-1111-1111-111111111111",
                 )
     mock_send_kafka_message.assert_called_once_with(
@@ -606,6 +609,7 @@ def test_process_msg_VLBA_TRANSFERRING(
                     status=1,
                     num_bytes=2048,
                     filename="fake_filename.png",
+                    stations=str("fake_station"),
                     message="Processing complete. Delete your raw data.",
                 )
 #=====================================================================
@@ -1032,6 +1036,7 @@ def test_track_etransfer_progress(
     payload = {
         "transfer_uuid": "11111111-1111-1111-1111-111111111111",
         "num_bytes": 1000,
+        "stations": str("fake_station"),
     }
 
     incoming_file = MagicMock()
@@ -1093,6 +1098,7 @@ def test_track_etransfer_progress_status_FAILED(
     payload = {
         "transfer_uuid": "11111111-1111-1111-1111-111111111111",
         "num_bytes": 1000,
+        "stations": str("fake_station"),
     }
 
     incoming_file = MagicMock()
@@ -1134,6 +1140,7 @@ def test_track_etransfer_progress_status_OTHER(
     payload = {
         "transfer_uuid": "11111111-1111-1111-1111-111111111111",
         "num_bytes": 1000,
+        "stations": str("fake_station"),
     }
 
     incoming_file = MagicMock()
