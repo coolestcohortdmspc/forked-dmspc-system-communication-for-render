@@ -118,7 +118,7 @@ def save_image_to_seaweedfs(target, image_file, dsoc_uuid):
     try:
         image_key = f"ddm/{target}/{dsoc_uuid}.png"
 
-        s3 = create_s3_client()
+        s3 = create_s3_client(station=Stations.DSOC)
         
         file_data = image_file
 
@@ -129,6 +129,7 @@ def save_image_to_seaweedfs(target, image_file, dsoc_uuid):
         return image_key
     except:
         publish_status_obsEvents(
+            station=Stations.DSOC,
             status=Status.FAILED,
             msg="Failed to connect to SeaweedFS.",
         )
@@ -431,4 +432,4 @@ class Command(BaseCommand):
 
         producer_topic, producer_config, consumer_topic, consumer_config = bootstrap(Stations.DSOC)
 
-        consume(consumer_topic, consumer_config, process_msg, producer_topic=producer_topic, producer_config=producer_config)
+        consume(Stations.DSOC, consumer_topic, consumer_config, process_msg, producer_topic=producer_topic, producer_config=producer_config)

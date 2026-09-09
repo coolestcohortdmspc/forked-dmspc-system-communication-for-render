@@ -219,6 +219,7 @@ class Command(BaseCommand):
         ) * 1000
 
         consume(
+            STATION_NAME,
             consumer_topic,
             consumer_config,
             process_msg,

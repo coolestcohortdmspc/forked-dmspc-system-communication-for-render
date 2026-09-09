@@ -153,7 +153,7 @@ def bootstrap(sim):
 #     load_dotenv(override=True)
 
 
-def consume(topic, config, process_msg, producer_topic=None, producer_config=None, manual_commit=False):
+def consume(station, topic, config, process_msg, producer_topic=None, producer_config=None, manual_commit=False):
     """
     Description: Creates a new consumer instance; subscribes to a Kafka topic and receives messages.
     Inputs: topic = The Kafka topic to receieve messages from.
@@ -191,6 +191,7 @@ def consume(topic, config, process_msg, producer_topic=None, producer_config=Non
                 print("Consumer error:", error)
 
                 publish_status_obsEvents(
+                    station=station,
                     status=Status.FAILED,
                     msg="Failed to connect to Kafka.",
                 )
@@ -204,13 +205,14 @@ def consume(topic, config, process_msg, producer_topic=None, producer_config=Non
                 consumer.commit(msg)
     except Exception as e:
         publish_status_obsEvents(
+            station=station,
             status=Status.FAILED,
             msg="Failed to connect to Kafka!",
         )
         raise
 
 
-def create_s3_client():
+def create_s3_client(station):
     """
     Creates the boto3 S3 client and waits for the S3 gateway
     to become available.
@@ -236,7 +238,7 @@ def create_s3_client():
             break
 
         except (EndpointConnectionError, ConnectionError):
-            publish_status_obsEvents(status=Status.POLLING, msg=f"Waiting for SeaweedFS... ({attempt + 1}/3)")
+            publish_status_obsEvents(station=station, status=Status.POLLING, msg=f"Waiting for SeaweedFS... ({attempt + 1}/3)")
             print(f"Waiting for SeaweedFS... ({attempt + 1}/3)")
             time.sleep(1)
 
@@ -527,7 +529,7 @@ def etc_send(frame_path):
         )
 
 
-def produce(topic, config, key, value):
+def produce(station, topic, config, key, value):
     delivery_error = None
 
     def delivery_report(err, msg):
@@ -548,6 +550,7 @@ def produce(topic, config, key, value):
 
         if delivery_error is not None:
             publish_status_obsEvents(
+                station=station,
                 status=Status.FAILED,
                 msg=f"{delivery_error}",
             )
@@ -555,6 +558,7 @@ def produce(topic, config, key, value):
 
         if remaining > 0:
             publish_status_obsEvents(
+                station=station,
                 status=Status.FAILED,
                 msg="Kafka broker did not respond.",
             )
@@ -565,6 +569,7 @@ def produce(topic, config, key, value):
 
     except Exception as e:
         publish_status_obsEvents(
+            station=station,
             status=Status.FAILED,
             msg=f"Failed to send Kafka message: {e}",
         )
@@ -596,6 +601,7 @@ def send_kafka_message(
     }
 
     produce(
+        stations,
         producer_topic,
         producer_config,
         key,
@@ -677,7 +683,7 @@ def record_transfer_event(
         message=message,
     )
 
-def publish_status_obsEvents(status, msg):
+def publish_status_obsEvents(station, status, msg):
     """
     Function to be used by all sims to publish failure status and message to the ObservatoryEvent database table.
     """
@@ -685,7 +691,7 @@ def publish_status_obsEvents(status, msg):
     data = {
         "object_id": 30104,
         "target": "Moretus",
-        "rcvr_station": Stations.HN,
+        "rcvr_station": station,
         "xmit_station": Stations.GBT,
         "event_time": datetime.now(timezone.utc),
         "latency_ms": 0.00,
