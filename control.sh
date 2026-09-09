@@ -22,17 +22,17 @@ KAFKA_PROFILES="--profile kafka"
 
 # the order of these services matter!! learned the hard way..
 KAFKA_SERVICES="zookeeper kafka-broker kafka-init kafka-ui kafka-exporter seaweedfs dsoc-volume-init"
-SIM_SERVICES="etr_daemon gbt vlba dsoc"
+SIM_SERVICES="etr_daemon gbt vlba0 vlba1 vlba2 vlba3 vlba4 vlba5 vlba6 vlba7 vlba8 vlba9 dsoc"
 
 PORTAINER_SERVICE="portainer"
 AGENT_SERVICE="portainer_agent"
 
 # TODO add the commented vlba sims when scaling up! (vlba9 and vlba10 should start before gbt)
-DSOC_SERVICES="traefik ngradar_website postgres prometheus grafana postgres_exporter zookeeper kafka-broker kafka-init kafka-ui kafka-exporter seaweedfs dsoc-volume-init dsoc etr_daemon"  # vlba7 vlba8
-VLBA_1_SERVICES="vlba"  # vlba2
-VLBA_2_SERVICES="vlba3 vlba4"
-VLBA_3_SERVICES="vlba5 vlba6"
-GBT_SERVICES="gbt"  # vlba9 vlba10
+DSOC_SERVICES="traefik ngradar_website postgres prometheus grafana postgres_exporter zookeeper kafka-broker kafka-init kafka-ui kafka-exporter seaweedfs dsoc-volume-init dsoc etr_daemon"  # vlba6 vlba7
+VLBA_1_SERVICES="vlba0 vlba1"
+VLBA_2_SERVICES="vlba2 vlba3"
+VLBA_3_SERVICES="vlba4 vlba5"
+GBT_SERVICES="gbt"  # vlba8 vlba9
 
 COMMAND="$1"
 
