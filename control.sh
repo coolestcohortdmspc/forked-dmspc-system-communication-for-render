@@ -28,11 +28,11 @@ PORTAINER_SERVICE="portainer"
 AGENT_SERVICE="portainer_agent"
 
 # TODO add the commented vlba sims when scaling up! (vlba-br and vlba-mk should start before gbt)
-DSOC_SERVICES="traefik ngradar_website postgres prometheus grafana postgres_exporter zookeeper kafka-broker kafka-init kafka-ui kafka-exporter seaweedfs dsoc-volume-init dsoc etr_daemon"  # vlba-kp vlba-ov
-VLBA_1_SERVICES="vlba-sc vlba-hn"
+DSOC_SERVICES="traefik ngradar_website postgres prometheus grafana postgres_exporter zookeeper kafka-broker kafka-init kafka-ui kafka-exporter seaweedfs dsoc-volume-init dsoc etr_daemon vlba-kp vlba-ov"
+VLBA_1_SERVICES="vlba-sc vlba-hn vlba-nl vlba-fd"
 VLBA_2_SERVICES="vlba-nl vlba-fd"
 VLBA_3_SERVICES="vlba-la vlba-pt"
-GBT_SERVICES="gbt"  # vlba-br vlba-mk
+GBT_SERVICES="vlba-br vlba-mk vlba-la vlba-pt gbt"
 
 COMMAND="$1"
 
@@ -196,11 +196,11 @@ droplets-up)
 
     echo "Starting DSOC Droplet"
     ssh "$DSOC_DROPLET" \
-        "cd $REMOTE_DIR && git checkout dev && git pull && ./control.sh dsoc-up"
+        "cd $REMOTE_DIR && git checkout tm/10-vlba-sims && git pull && ./control.sh dsoc-up"
     
     echo "Starting VLBA 1 Droplet"
     ssh "$VLBA_1_DROPLET" \
-        "cd $REMOTE_DIR && git checkout dev && git pull && ./control.sh vlba-up VLBA_1_SERVICES"
+        "cd $REMOTE_DIR && git checkout tm/10-vlba-sims && git pull && ./control.sh vlba-up VLBA_1_SERVICES"
     
     # TODO use these for scaling up
     # echo "Starting VLBA 2 Droplet"
@@ -213,7 +213,7 @@ droplets-up)
     
     echo "Starting GBT Droplet"
     ssh "$GBT_DROPLET" \
-        "cd $REMOTE_DIR && git checkout dev && git pull && ./control.sh gbt-up"
+        "cd $REMOTE_DIR && git checkout tm/10-vlba-sims && git pull && ./control.sh gbt-up"
     ;;
 
 droplets-down)
@@ -225,11 +225,11 @@ droplets-down)
 
     echo "Stopping GBT Droplet"
     ssh "$GBT_DROPLET" \
-        "cd $REMOTE_DIR && git checkout dev && ./control.sh gbt-down"
+        "cd $REMOTE_DIR && git checkout tm/10-vlba-sims && ./control.sh gbt-down"
     
     echo "Stopping VLBA 1 Droplet"
     ssh "$VLBA_1_DROPLET" \
-        "cd $REMOTE_DIR && git checkout dev && ./control.sh vlba-down VLBA_1_SERVICES"
+        "cd $REMOTE_DIR && git checkout tm/10-vlba-sims && ./control.sh vlba-down VLBA_1_SERVICES"
     
     # TODO use these for scaling up
     # echo "Stopping VLBA 2 Droplet"
@@ -242,7 +242,7 @@ droplets-down)
     
     echo "Stopping DSOC Droplet"
     ssh "$DSOC_DROPLET" \
-        "cd $REMOTE_DIR && git checkout dev && ./control.sh dsoc-down"
+        "cd $REMOTE_DIR && git checkout tm/10-vlba-sims && ./control.sh dsoc-down"
     ;;
 *)
     echo
