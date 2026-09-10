@@ -8,7 +8,6 @@ import numpy as np
 import io
 from ngRadar_Website.models.models import gbtEvent, dsocEvent, ETransferEvent
 from ngRadar_Website.enums import Stations, Status, Message
-# from ngRadar_Website.utils import latency_calc, bootstrap, consume, create_s3_client, upload_seaweedfs, write_transfer_progress, send_kafka_message, get_folder_size
 from ngRadar_Website.utils import *
 from pathlib import Path
 import json
@@ -119,7 +118,7 @@ def save_image_to_seaweedfs(target, image_file, dsoc_uuid):
     try:
         image_key = f"ddm/{target}/{dsoc_uuid}.png"
 
-        s3 = create_s3_client()
+        s3 = create_s3_client(station=Stations.DSOC)
         
         file_data = image_file
 
@@ -130,6 +129,7 @@ def save_image_to_seaweedfs(target, image_file, dsoc_uuid):
         return image_key
     except:
         publish_status_obsEvents(
+            station=Stations.DSOC,
             status=Status.FAILED,
             msg="Failed to connect to SeaweedFS.",
         )
@@ -162,6 +162,7 @@ def verify_incoming_transfer(
 def track_etransfer_progress(payload, incoming_file: Path):
     transfer_uuid = payload["transfer_uuid"] # syntax?
     num_bytes = payload["num_bytes"] # make this an int?
+    station = payload["station"] # make this an int?
     received_bytes = 0
     write_transfer_progress( # resetting progress.json to zero so below logic doesn't read from previous run. Submit button does this too, but not on system-up :(
         received_bytes=0,
@@ -195,7 +196,7 @@ def track_etransfer_progress(payload, incoming_file: Path):
             break
 
         if time.monotonic() - last_progress_at > STALL_TIMEOUT_SECONDS:
-            if consumer_group_has_members(f"{Stations.HN.name.lower()}-consumer-group"):
+            if consumer_group_has_members(f"{station.name.lower()}-consumer-group"):
                 # vlba is alive, the transfer is just slow. Start the clock over.
                 last_progress_at = time.monotonic()
             else:
@@ -219,6 +220,7 @@ def track_etransfer_progress(payload, incoming_file: Path):
 def process_msg(msg, producer_topic, producer_config):
     incoming_key = int(msg.key().decode("utf-8"))
     payload = json.loads(msg.value().decode("utf-8"))
+    station = payload["station"]
     volume_folder = Path("/dsoc/incoming")
     
     if incoming_key == Message.VLBA_REQUEST_STORAGE.value:
@@ -230,7 +232,7 @@ def process_msg(msg, producer_topic, producer_config):
             record_transfer_event(
                 transfer_uuid=payload["transfer_uuid"],
                 gbt_uuid=payload["gbt_uuid"],
-                station=Stations.HN,
+                station=station,
                 status=Status.FAILED,
                 num_bytes=payload["num_bytes"],
                 message=payload["message"],
@@ -249,7 +251,7 @@ def process_msg(msg, producer_topic, producer_config):
                     record_transfer_event(
                         transfer_uuid=payload["transfer_uuid"],
                         gbt_uuid=payload["gbt_uuid"],
-                        station=Stations.HN,
+                        station=station,
                         status=Status.FAILED,
                         num_bytes=payload["num_bytes"],
                         message=f"DSOC does not have enough storage. Failed 15 times.",
@@ -262,7 +264,7 @@ def process_msg(msg, producer_topic, producer_config):
                         record_transfer_event(
                             transfer_uuid=payload["transfer_uuid"],
                             gbt_uuid=payload["gbt_uuid"],
-                            station=Stations.HN,
+                            station=station,
                             status=Status.RETRYING,
                             num_bytes=payload["num_bytes"],
                             message=f"DSOC does not have enough storage. Retrying...",
@@ -276,6 +278,7 @@ def process_msg(msg, producer_topic, producer_config):
                         status=payload["status"],
                         num_bytes=payload["num_bytes"],
                         filename=payload["filename"],
+                        station=station,
                         message=payload["message"]+1,
                     )
                     print(f"DSOC does not have enough storage to accept the data transfer request. The remaining disk space is {space_remaining:0.2f}GB and the incoming data is {expected_num_bytes/1000000000:0.2f}GB")
@@ -286,10 +289,10 @@ def process_msg(msg, producer_topic, producer_config):
                     record_transfer_event(
                         transfer_uuid=payload["transfer_uuid"],
                         gbt_uuid=payload["gbt_uuid"],
-                        station=Stations.HN,
+                        station=station,
                         status=Status.READY,
                         num_bytes=payload["num_bytes"],
-                        message=f"DSOC made room to to accept the incoming data from {Stations.HN.label}",
+                        message=f"DSOC made room to to accept the incoming data from {station}",
                     )     
                     
                 send_kafka_message(
@@ -301,6 +304,7 @@ def process_msg(msg, producer_topic, producer_config):
                     status=payload["status"],
                     num_bytes=payload["num_bytes"],
                     filename=payload["filename"],
+                    station=station,
                     message="Yes",
                 )
                 print("DSOC has enough storage to accept the incoming data. Awaiting e-transfer...")
@@ -317,7 +321,7 @@ def process_msg(msg, producer_topic, producer_config):
             record_transfer_event(
                 transfer_uuid=payload["transfer_uuid"],
                 gbt_uuid=payload["gbt_uuid"],
-                station=Stations.HN,
+                station=station,
                 status=Status.TRANSFERRED,
                 num_bytes=payload["num_bytes"],
                 message="Hancock VLBA e-transfer complete",
@@ -378,7 +382,7 @@ def process_msg(msg, producer_topic, producer_config):
                     num_bytes=image_num_bytes,
                     data=data,
                     xmit_station=Stations.GBT,
-                    rcvr_station=Stations.HN,
+                    rcvr_station=station,
                     transfer_uuid=payload["transfer_uuid"],
                 )
 
@@ -412,6 +416,7 @@ def process_msg(msg, producer_topic, producer_config):
             status=payload["status"],
             num_bytes=payload["num_bytes"],
             filename=payload["filename"],
+            station=station,
             message="Processing complete. Delete your raw data.",
         )
         
@@ -427,4 +432,4 @@ class Command(BaseCommand):
 
         producer_topic, producer_config, consumer_topic, consumer_config = bootstrap(Stations.DSOC)
 
-        consume(consumer_topic, consumer_config, process_msg, producer_topic=producer_topic, producer_config=producer_config)
+        consume(Stations.DSOC, consumer_topic, consumer_config, process_msg, producer_topic=producer_topic, producer_config=producer_config)

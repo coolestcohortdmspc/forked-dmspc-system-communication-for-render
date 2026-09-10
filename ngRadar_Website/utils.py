@@ -71,24 +71,25 @@ def config_func(sim, bootstrap):
     """
 
     # determine the type of sim being used - each one has unique kafka topics:
-    if sim in [Stations.GBT, Stations.HN, Stations.DSOC]:
+    if sim == Stations.GBT:
+        # GBT consumes from UI, produces to GBT
         type = "producer and consumer"
-        if sim == Stations.GBT:
-            # GBT consumes from UI, produces to GBT
-            topic1 = ["user_input"]
-            topic2 = "GBT_data"
-        elif sim == Stations.HN:
-            # VLBA consumes from GBT and DSOC, produces to DSOC
-            topic1 = ["GBT_data", "DSOC_notif"]
-            topic2 = "VLBA_notif"
-        elif sim == Stations.DSOC:
-            # DSOC is now consuming from and producing to VLBA
-            topic1 = ["VLBA_notif"]  #consumes from the GBT's topic
-            topic2 = "DSOC_notif"
-    else:  # sim == Stations.UI:
+        topic1 = ["user_input"]
+        topic2 = "GBT_data"
+    elif sim == Stations.DSOC:
+        # DSOC is now consuming from and producing to VLBA
+        type = "producer and consumer"
+        topic1 = ["VLBA_notif"]  #consumes from the GBT's topic
+        topic2 = "DSOC_notif"
+    elif sim == Stations.UI:
         # UI produces to UI topic
         type = "producer"
         topic = "user_input"
+    else: # sim == VLBA station
+        # VLBA consumes from GBT and DSOC, produces to DSOC
+        type = "producer and consumer"
+        topic1 = ["GBT_data", "DSOC_notif"]
+        topic2 = "VLBA_notif"
 
     # perform the shared behavior for each type:
     if type == "producer and consumer":
@@ -142,26 +143,7 @@ def bootstrap(sim):
     """
     load_dotenv()  # Load environment variables from .env file
 
-    # p = Path("../../../../out/ngrok_endpoint.env")
-    # text = p.read_text().strip()
-
-    # bootstrap = None
-    # for line in text.splitlines():
-    #     if line.startswith("BOOTSTRAP_SERVER="):
-    #         bootstrap = line.split("=", 1)[1].strip()
-    #         break
-
-    # if not bootstrap:
-    #     raise RuntimeError("BOOTSTRAP_SERVER not found in /out/ngrok_endpoint.env")
-
     bootstrap = os.getenv("BOOTSTRAP_SERVER", "kafka-broker:29092")
-    
-    # if sim != Stations.DSOC:
-    #     producer_topic, producer_config, consumer_topic, consumer_config = config_func(sim, bootstrap)
-    #     return producer_topic, producer_config, consumer_topic, consumer_config
-    # else:
-    #     topic, config = config_func(sim, bootstrap)
-    #     return topic, config
 
     return config_func(sim, bootstrap)
     
@@ -171,7 +153,7 @@ def bootstrap(sim):
 #     load_dotenv(override=True)
 
 
-def consume(topic, config, process_msg, producer_topic=None, producer_config=None, manual_commit=False):
+def consume(station, topic, config, process_msg, producer_topic=None, producer_config=None, manual_commit=False):
     """
     Description: Creates a new consumer instance; subscribes to a Kafka topic and receives messages.
     Inputs: topic = The Kafka topic to receieve messages from.
@@ -209,6 +191,7 @@ def consume(topic, config, process_msg, producer_topic=None, producer_config=Non
                 print("Consumer error:", error)
 
                 publish_status_obsEvents(
+                    station=station,
                     status=Status.FAILED,
                     msg="Failed to connect to Kafka.",
                 )
@@ -222,13 +205,14 @@ def consume(topic, config, process_msg, producer_topic=None, producer_config=Non
                 consumer.commit(msg)
     except Exception as e:
         publish_status_obsEvents(
+            station=station,
             status=Status.FAILED,
             msg="Failed to connect to Kafka!",
         )
         raise
 
 
-def create_s3_client():
+def create_s3_client(station):
     """
     Creates the boto3 S3 client and waits for the S3 gateway
     to become available.
@@ -254,7 +238,7 @@ def create_s3_client():
             break
 
         except (EndpointConnectionError, ConnectionError):
-            publish_status_obsEvents(status=Status.POLLING, msg=f"Waiting for SeaweedFS... ({attempt + 1}/3)")
+            publish_status_obsEvents(station=station, status=Status.POLLING, msg=f"Waiting for SeaweedFS... ({attempt + 1}/3)")
             print(f"Waiting for SeaweedFS... ({attempt + 1}/3)")
             time.sleep(1)
 
@@ -545,7 +529,7 @@ def etc_send(frame_path):
         )
 
 
-def produce(topic, config, key, value):
+def produce(station, topic, config, key, value):
     delivery_error = None
 
     def delivery_report(err, msg):
@@ -566,6 +550,7 @@ def produce(topic, config, key, value):
 
         if delivery_error is not None:
             publish_status_obsEvents(
+                station=station,
                 status=Status.FAILED,
                 msg=f"{delivery_error}",
             )
@@ -573,6 +558,7 @@ def produce(topic, config, key, value):
 
         if remaining > 0:
             publish_status_obsEvents(
+                station=station,
                 status=Status.FAILED,
                 msg="Kafka broker did not respond.",
             )
@@ -583,6 +569,7 @@ def produce(topic, config, key, value):
 
     except Exception as e:
         publish_status_obsEvents(
+            station=station,
             status=Status.FAILED,
             msg=f"Failed to send Kafka message: {e}",
         )
@@ -599,8 +586,8 @@ def send_kafka_message(
     status,
     num_bytes,
     filename,
+    station,
     message="",
-    stations=Stations.HN,
 ):
     payload = {
         "transfer_uuid": str(transfer_uuid),
@@ -610,10 +597,11 @@ def send_kafka_message(
         "filename": filename,
         "event_time": datetime.now(timezone.utc).isoformat(),
         "message": message,
-        "stations": stations.label,
+        "station": station,
     }
 
     produce(
+        station,
         producer_topic,
         producer_config,
         key,
@@ -621,7 +609,7 @@ def send_kafka_message(
     )
 
     
-def create_file(file_path, file_mb=200):
+def create_file(file_path, file_mb=20):
     file_size_bytes = file_mb * 1024 * 1024
     num_buffers = 100
 
@@ -695,7 +683,7 @@ def record_transfer_event(
         message=message,
     )
 
-def publish_status_obsEvents(status, msg):
+def publish_status_obsEvents(station, status, msg):
     """
     Function to be used by all sims to publish failure status and message to the ObservatoryEvent database table.
     """
@@ -703,7 +691,7 @@ def publish_status_obsEvents(status, msg):
     data = {
         "object_id": 30104,
         "target": "Moretus",
-        "rcvr_station": Stations.HN,
+        "rcvr_station": station,
         "xmit_station": Stations.GBT,
         "event_time": datetime.now(timezone.utc),
         "latency_ms": 0.00,

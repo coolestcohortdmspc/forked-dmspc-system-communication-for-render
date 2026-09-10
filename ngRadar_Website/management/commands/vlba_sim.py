@@ -37,6 +37,13 @@ FAILURE_REASONS = {
 # disk), which would otherwise retry at full speed forever.
 MAX_RESUME_ATTEMPTS = 5
 
+STATION = Stations.HN
+"""
+Use this constant instead once Ty's docker changes are in:
+
+STATION_NAME = os.environ.get("STATION_NAME")
+STATION = Stations[STATION_NAME]
+"""
 
 def process_msg(msg, producer_topic, producer_config):
     incoming_key = int(msg.key().decode("utf-8"))
@@ -60,7 +67,7 @@ def process_msg(msg, producer_topic, producer_config):
             record_transfer_event(
                     transfer_uuid=transfer_uuid,
                     gbt_uuid=gbt_uuid,
-                    station=Stations.HN,
+                    station=STATION,
                     status=Status.READY,
                     num_bytes=num_bytes,
                     message="Hancock VLBA data file complete. Ready for e-transfer.",
@@ -74,6 +81,7 @@ def process_msg(msg, producer_topic, producer_config):
                 status=Status.READY,
                 num_bytes=num_bytes,
                 filename=frame_path.name,
+                station=STATION,
                 message=1,
             )
             print("VLBA requesting DSOC check storage...")
@@ -88,6 +96,7 @@ def process_msg(msg, producer_topic, producer_config):
                 status=Status.FAILED,
                 num_bytes=0,
                 filename=frame_path.name,
+                station=STATION,
                 message="Source file does not exist",
             )
             print("Source file does not exist.")
@@ -113,7 +122,7 @@ def process_msg(msg, producer_topic, producer_config):
                     record_transfer_event(
                         transfer_uuid=payload["transfer_uuid"],
                         gbt_uuid=payload["gbt_uuid"],
-                        station=Stations.HN,
+                        station=STATION,
                         status=Status.TRANSFERRING,
                         num_bytes=payload["num_bytes"],
                         message="Hancock VLBA e-transfer in progress",
@@ -128,6 +137,7 @@ def process_msg(msg, producer_topic, producer_config):
                         status=Status.TRANSFERRING,
                         num_bytes=payload["num_bytes"],
                         filename=payload["filename"],
+                        station=STATION,
                         message="Hancock VLBA has started to send the data file to DSOC via e-transfer",
                     )
                     frame_path = raw_data_path / f"{payload['transfer_uuid']}.bin"
@@ -141,7 +151,7 @@ def process_msg(msg, producer_topic, producer_config):
                     record_transfer_event(
                         transfer_uuid=payload["transfer_uuid"],
                         gbt_uuid=payload["gbt_uuid"],
-                        station=Stations.HN,
+                        station=STATION,
                         status=Status.FAILED,
                         num_bytes=payload["num_bytes"],
                         message=(
@@ -166,7 +176,7 @@ def process_msg(msg, producer_topic, producer_config):
                     record_transfer_event(
                         transfer_uuid=payload["transfer_uuid"],
                         gbt_uuid=payload["gbt_uuid"],
-                        station=Stations.HN,
+                        station=STATION,
                         status=Status.FAILED,
                         num_bytes=payload["num_bytes"],
                         message=f"The e-transfer failed unexpectedly mid-transfer. Transfer interrupted. ({exc})",
@@ -186,6 +196,7 @@ def process_msg(msg, producer_topic, producer_config):
                 status=Status.READY,
                 num_bytes=payload["num_bytes"],
                 filename=payload["filename"],
+                station=STATION,
                 message=payload["message"],
             )
 
@@ -206,7 +217,7 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         print("Starting VLBA simulator")
 
-        producer_topic, producer_config, consumer_topic, consumer_config = bootstrap(Stations.HN)
+        producer_topic, producer_config, consumer_topic, consumer_config = bootstrap(STATION)
 
         # process_msg blocks while wait_for_etd() waits for etr_daemon to come back
         consumer_config["max.poll.interval.ms"] = (
@@ -214,6 +225,7 @@ class Command(BaseCommand):
         ) * 1000
 
         consume(
+            STATION,
             consumer_topic,
             consumer_config,
             process_msg,

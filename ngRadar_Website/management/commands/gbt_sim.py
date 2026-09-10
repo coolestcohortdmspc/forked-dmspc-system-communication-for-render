@@ -72,7 +72,7 @@ def process_msg(msg, producer_topic, producer_config):
     key, value = f"{Message.GBT_TX}", f"{gbt_uuid}"
 
     # produce this new message, lets DSOC know to produce image(s)
-    produce(producer_topic, producer_config, key, value)
+    produce(Stations.GBT, producer_topic, producer_config, key, value)
 
 
 class Command(BaseCommand):
@@ -87,5 +87,5 @@ class Command(BaseCommand):
         payload = set_payload_dict('W48', -1)
         gbt_uuid = publish_gbtEvents(payload)
         key, value = f"{Message.GBT_TX}", f"{gbt_uuid}"
-        produce(producer_topic, producer_config, key, value)
-        consume(consumer_topic, consumer_config, process_msg, producer_topic=producer_topic, producer_config=producer_config)
+        produce(Stations.GBT, producer_topic, producer_config, key, value)
+        consume(Stations.GBT, consumer_topic, consumer_config, process_msg, producer_topic=producer_topic, producer_config=producer_config)

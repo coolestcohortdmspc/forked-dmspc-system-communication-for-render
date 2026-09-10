@@ -144,7 +144,7 @@ def serve_image(request, uuid):
 
         bucket = os.environ["WEED_S3_BUCKET"]
 
-        s3 = create_s3_client()
+        s3 = create_s3_client(station=Stations.DSOC)
 
         # presigned_url = get_presigned_url(s3, event)
         # return redirect(presigned_url)
@@ -160,6 +160,7 @@ def serve_image(request, uuid):
         )
     except:
         publish_status_obsEvents(
+            station=Stations.DSOC,
             status=Status.FAILED,
             msg="Failed to connect to SeaweedFS.",
         )
@@ -235,7 +236,7 @@ def submit_waveform(request):
         def main():
             key = str(Message.UI_EVENT)
             value = uuid_input.hex  # Use the UUID as the value for the Kafka message
-            produce(topic, config, key, value)
+            produce(Stations.UI, topic, config, key, value)
             write_transfer_progress(received_bytes=0, total_bytes=0, percent=0.0, transfer_id=0)  # Reset the progress bar after sending the message
         main()
         

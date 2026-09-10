@@ -150,6 +150,7 @@ def test_serve_image_error(mock_publish, mock_get_obj):
 
     mock_get_obj.assert_called_once_with(ObservatoryEvent, uuid="uuid")
     mock_publish.assert_called_once_with(
+            station=Stations.DSOC,
             status=Status.FAILED,
             msg="Failed to connect to SeaweedFS.",
         )
@@ -198,11 +199,13 @@ def test_submit_waveform(Mock_UI_EVENT, Mock_ProgressBar, Mock_Cache, Mock_Produ
     Mock_Producer.assert_called_once()
     
     #get the parameters from the Mock_producer
-    waveform_producer_topic = Mock_Producer.call_args[0][0]
-    waveform_producer_config = Mock_Producer.call_args[0][1]
-    waveform_producer_messageKey = Mock_Producer.call_args[0][2]
-    waveform_producer_uuid = Mock_Producer.call_args[0][3]
+    waveform_producer_station = Mock_Producer.call_args[0][0]
+    waveform_producer_topic = Mock_Producer.call_args[0][1]
+    waveform_producer_config = Mock_Producer.call_args[0][2]
+    waveform_producer_messageKey = Mock_Producer.call_args[0][3]
+    waveform_producer_uuid = Mock_Producer.call_args[0][4]
 
+    assert waveform_producer_station == Stations.UI
     #test that data sent in the fake message matches the simulated data
     assert waveform_producer_topic == "user_input"
 
