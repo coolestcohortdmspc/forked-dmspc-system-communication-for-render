@@ -161,13 +161,16 @@ def test_serve_image_error(mock_publish, mock_get_obj):
 @patch("ngRadar_Website.views.views.datetime")
 @patch("ngRadar_Website.views.views.produce")
 @patch("ngRadar_Website.views.views.cache")
+@patch("ngRadar_Website.views.views.send_kafka_message")
 @patch("ngRadar_Website.views.views.write_transfer_progress")
 @patch("ngRadar_Website.views.views.uiEvent.objects.create")
-def test_submit_waveform(Mock_UI_EVENT, Mock_ProgressBar, Mock_Cache, Mock_Producer, mock_datetime, test_uuid):
+def test_submit_waveform(Mock_UI_EVENT, Mock_ProgressBar, mock_send_kafka_message, Mock_Cache, Mock_Producer, mock_datetime, test_uuid):
     #create simulated data
     mock_uuid = uuid.UUID('12345678-1234-5678-1234-567812345678')
     test_timestamp = datetime(2026, 8, 17, 12, 30, 45, tzinfo=timezone.utc)
     test_waveform = '45'
+    mock_request_user = MagicMock()
+    mock_request_user.username = 'test_user'
 
     #create fixed return values for UUID and date time
     test_uuid.return_value = mock_uuid
@@ -177,10 +180,7 @@ def test_submit_waveform(Mock_UI_EVENT, Mock_ProgressBar, Mock_Cache, Mock_Produ
     factory = RequestFactory()
     myRequest = factory.post('home/submit-waveform/', data={'waveform':test_waveform})
 
-    # #mock the bootsrap value
-    # mock_ngrok = MagicMock()
-    # mock_ngrok.bootstrap = mock_endpoint
-    # Mock_bootstrap.return_value = mock_ngrok
+    myRequest.user = mock_request_user
 
     #mock a UI Event
     Mock_EVENT = MagicMock()
@@ -195,25 +195,31 @@ def test_submit_waveform(Mock_UI_EVENT, Mock_ProgressBar, Mock_Cache, Mock_Produ
     Mock_UI_EVENT.assert_called_once()
 
     # Assert waveform_producer was called
-    Mock_Producer.assert_called_once()
+    # Mock_Producer.assert_called_once()
+    mock_send_kafka_message.assert_called_once()
     
     #get the parameters from the Mock_producer
-    waveform_producer_topic = Mock_Producer.call_args[0][0]
-    waveform_producer_config = Mock_Producer.call_args[0][1]
-    waveform_producer_messageKey = Mock_Producer.call_args[0][2]
-    waveform_producer_uuid = Mock_Producer.call_args[0][3]
+    # waveform_producer_topic = Mock_Producer.call_args[0][0]
+    # waveform_producer_config = Mock_Producer.call_args[0][1]
+    # waveform_producer_messageKey = Mock_Producer.call_args[0][2]
+    # waveform_producer_uuid = Mock_Producer.call_args[0][3]
+    _, kwargs = mock_send_kafka_message.call_args
+
+    assert kwargs["key"] == str(Message.UI_EVENT)
+    assert kwargs["producer_topic"] == "user_input"
+    assert kwargs["producer_config"]["client.id"] == "ui-producer"
+    assert kwargs["message"] == f"User {mock_request_user.username} submitted a waveform"
 
     #test that data sent in the fake message matches the simulated data
-    assert waveform_producer_topic == "user_input"
+    # assert waveform_producer_topic == "user_input"
 
-    # assert waveform_producer_config['bootstrap.servers'] == mock_endpoint
-    assert waveform_producer_config['client.id'] == 'ui-producer'
+    # # assert waveform_producer_config['bootstrap.servers'] == mock_endpoint
+    # assert waveform_producer_config['client.id'] == 'ui-producer'
 
-    assert waveform_producer_messageKey == str(Message.UI_EVENT)
+    # assert waveform_producer_messageKey == str(Message.UI_EVENT)
 
-
-    #assert the UUID and convert to hexadecimal
-    assert waveform_producer_uuid == mock_uuid.hex
+    # #assert the UUID and convert to hexadecimal
+    # assert waveform_producer_uuid == mock_uuid.hex
 
     #assert json.loads(waveform_producer_value.decode('utf-8')) == "User input a new waveform."
 
