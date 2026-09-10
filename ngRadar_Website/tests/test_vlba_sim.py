@@ -48,7 +48,6 @@ def test_process_msg_GBT_TX(
         mock_Path,
         mock_create
 ):
-    STATION = Stations.PT
     msg = MagicMock()
     msg.value.return_value = b'{"value"}'
     msg.key.return_value = b'5'
@@ -72,7 +71,8 @@ def test_process_msg_GBT_TX(
     mock_frame_path.is_file.return_value = True
     mock_frame_path.stat.return_value.st_size = 500
 
-    process_msg(msg, producer_topic, producer_config)
+    with patch("ngRadar_Website.management.commands.vlba_sim.STATION", Stations.PT):
+        process_msg(msg, producer_topic, producer_config)
 
     assert mock_uuid.call_count == 1
     mock_Thread.assert_called_once_with(target=mock_create, args=(mock_frame_path,), daemon=True)
@@ -80,7 +80,7 @@ def test_process_msg_GBT_TX(
     mock_record_transfer_event.assert_called_once_with(
                     transfer_uuid="12345",
                     gbt_uuid='{"value"}',
-                    station=Stations.HN,
+                    station=Stations.PT,
                     status=Status.READY,
                     num_bytes=500,
                     message="Hancock VLBA data file complete. Ready for e-transfer.",
@@ -94,7 +94,7 @@ def test_process_msg_GBT_TX(
                     status=Status.READY,
                     num_bytes=500,
                     filename=mock_frame_path.name,
-                    stations=STATION,
+                    stations=Stations.PT,
                     message=1,
                 )
 
@@ -142,7 +142,8 @@ def test_process_msg_GBT_TX_FAILED(
 
     mock_frame_path.is_file.return_value = False
 
-    process_msg(msg, producer_topic, producer_config)
+    with patch("ngRadar_Website.management.commands.vlba_sim.STATION", Stations.PT):
+        process_msg(msg, producer_topic, producer_config)
 
     assert mock_uuid.call_count == 1
     mock_Thread.assert_called_once_with(target=mock_create, args=(mock_frame_path,), daemon=True)
@@ -157,6 +158,7 @@ def test_process_msg_GBT_TX_FAILED(
                     status=Status.FAILED,
                     num_bytes=0,
                     filename=mock_frame_path.name,
+                    stations=Stations.PT,
                     message="Source file does not exist",
                 )
 #=====================================================================
@@ -201,13 +203,14 @@ def test_process_msg_DSOC_RESPOND_STORAGE(
 
     mock_json.return_value = mock_payload
 
-    process_msg(msg, producer_topic, producer_config)
+    with patch("ngRadar_Website.management.commands.vlba_sim.STATION", Stations.PT):
+        process_msg(msg, producer_topic, producer_config)
 
     assert mock_json.call_count == 1
     mock_record_transfer_event.assert_called_once_with(
                     transfer_uuid=str(transfer_uuid),
                     gbt_uuid=str(gbt_uuid),
-                    station=Stations.HN,
+                    station=Stations.PT,
                     status=Status.TRANSFERRING,
                     num_bytes=mock_payload["num_bytes"],
                     message="Hancock VLBA e-transfer in progress"
@@ -221,6 +224,7 @@ def test_process_msg_DSOC_RESPOND_STORAGE(
                     status=Status.TRANSFERRING,
                     num_bytes=2048,
                     filename="fake_filename.png",
+                    stations=Stations.PT,
                     message="Hancock VLBA has started to send the data file to DSOC via e-transfer",
                 )    
     mock_etc_send.assert_called_once_with(Path("/raw_data/11111111-1111-1111-1111-111111111111.bin"))
@@ -276,7 +280,8 @@ def test_process_msg_DSOC_RESPOND_STORAGE_CalledProcessError(
 
     mock_wait_for_etd.return_value = True
 
-    result = process_msg(msg, producer_topic, producer_config)
+    with patch("ngRadar_Website.management.commands.vlba_sim.STATION", Stations.PT):
+        result = process_msg(msg, producer_topic, producer_config)
 
     assert result is False
     assert mock_json.call_count == 1
@@ -290,7 +295,7 @@ def test_process_msg_DSOC_RESPOND_STORAGE_CalledProcessError(
             call(
                 transfer_uuid=str(transfer_uuid),
                 gbt_uuid=str(gbt_uuid),
-                station=Stations.HN,
+                station=Stations.PT,
                 status=Status.TRANSFERRING,
                 num_bytes=mock_payload["num_bytes"],
                 message="Hancock VLBA e-transfer in progress",
@@ -298,7 +303,7 @@ def test_process_msg_DSOC_RESPOND_STORAGE_CalledProcessError(
             call(
                 transfer_uuid=str(transfer_uuid),
                 gbt_uuid=str(gbt_uuid),
-                station=Stations.HN,
+                station=Stations.PT,
                 status=Status.FAILED,
                 num_bytes=mock_payload["num_bytes"],
                 message=(
@@ -354,7 +359,8 @@ def test_process_msg_DSOC_RESPOND_STORAGE_OSError(
 
     mock_etc_send.side_effect = OSError
 
-    process_msg(msg, producer_topic, producer_config)
+    with patch("ngRadar_Website.management.commands.vlba_sim.STATION", Stations.PT):
+        process_msg(msg, producer_topic, producer_config)
 
     assert mock_json.call_count == 1
     assert mock_record_transfer_event.call_count == 2
@@ -367,6 +373,7 @@ def test_process_msg_DSOC_RESPOND_STORAGE_OSError(
                     status=Status.TRANSFERRING,
                     num_bytes=2048,
                     filename="fake_filename.png",
+                    stations=Stations.PT,
                     message="Hancock VLBA has started to send the data file to DSOC via e-transfer",
                 )     
     mock_etc_send.assert_called_once_with(Path("/raw_data/11111111-1111-1111-1111-111111111111.bin"))
@@ -416,7 +423,8 @@ def test_process_msg_DSOC_RESPOND_STORAGE_No(
     mock_json.return_value = mock_payload
     mock_sleep.return_value = None # we don't want 5 seconds of sleep in test
 
-    process_msg(msg, producer_topic, producer_config)
+    with patch("ngRadar_Website.management.commands.vlba_sim.STATION", Stations.PT):
+        process_msg(msg, producer_topic, producer_config)
 
     assert mock_json.call_count == 1
     assert mock_record_transfer_event.call_count == 0
@@ -430,6 +438,7 @@ def test_process_msg_DSOC_RESPOND_STORAGE_No(
                     status=Status.READY,
                     num_bytes=2048,
                     filename="fake_filename.png",
+                    stations=Stations.PT,
                     message=1,
                 )      
     assert mock_etc_send.call_count == 0

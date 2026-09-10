@@ -911,7 +911,7 @@ def test_send_kafka_message(mock_datetime, mock_produce):
         producer_topic,
         producer_config,
         key,
-        '{"transfer_uuid": "test_transfer_uuid", "gbt_uuid": "test_gbt_uuid", "status": 4, "num_bytes": 2048, "filename": "mock.filename", "event_time": "2026-08-12T12:34:56+00:00", "message": 1, "stations": "Hancock (25-m, VLBA)"}',
+        f'{{"transfer_uuid": "test_transfer_uuid", "gbt_uuid": "test_gbt_uuid", "status": 4, "num_bytes": 2048, "filename": "mock.filename", "event_time": "2026-08-12T12:34:56+00:00", "message": 1, "stations": {stations}}}',
     )
 
 
