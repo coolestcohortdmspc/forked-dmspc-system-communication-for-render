@@ -21,3 +21,5 @@ numpy
 pytest
 pytest-django
 pytest-cov
+uvicorn
+fastapi
