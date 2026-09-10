@@ -274,6 +274,12 @@ services:
     networks:
       - ngradar_website_network
       - proxy
+    environment:
+      # this is what tells the ngradar_website service to run the UI Kafka consumer in a separate thread, which is what we want for the SSE functionality.
+      ENABLE_UI_KAFKA_CONSUMER: "true"
+      UI_KAFKA_TOPICS: "GBT_notif,VLBA_notif,DSOC_notif"
+      UI_KAFKA_GROUP_ID: "ngradar-ui-sse"
+      BOOTSTRAP_SERVER: "kafka-broker:29092"
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=proxy"
@@ -288,11 +294,10 @@ services:
       - "traefik.http.services.ngradar_website.loadbalancer.server.port=8000"
     stdin_open: true
     tty: true
-    command:
-      - python
-      - manage.py
-      - runserver
-      - 0.0.0.0:8000
+    command: >
+      uvicorn asgi:application
+      --host 0.0.0.0
+      --port 8000
 
 
   postgres:
@@ -332,22 +337,6 @@ services:
       timeout: 5s
       retries: 5
 
-  # staging_loader:
-  #   container_name: staging_loader
-  #   build:
-  #     context: .
-  #     target: load-staging-data
-  #   env_file:
-  #     - .env
-  #   networks:
-  #     - ngradar_website_network
-  #   depends_on:
-  #     - postgres
-  #   volumes:
-  #     - staging_dump:/dump
-  #   profiles:
-  #     - tools
-
 #==========================
 # kafka related containers:
 #==========================
@@ -382,13 +371,7 @@ services:
 
       kafka-topics --bootstrap-server kafka-broker:29092 \
         --create --if-not-exists \
-        --topic user_input \
-        --partitions 3 \
-        --replication-factor 1
-
-      kafka-topics --bootstrap-server kafka-broker:29092 \
-        --create --if-not-exists \
-        --topic GBT_data \
+        --topic GBT_notif \
         --partitions 3 \
         --replication-factor 1
 
@@ -407,32 +390,6 @@ services:
       echo "Kafka topic initialization complete."
     restart: "no"
 
-
-
-# Commenting this out because we don't need it for local dev and we won't need it for the droplets on DO either.
-# But keeping it in case we ever do need ngrok again at some point?
-  # ngrok:
-  #   image: ngrok/ngrok:latest
-  #   profiles: ["kafka"]
-  #   env_file:
-  #     - .env
-  #   environment:
-  #     NGROK_AUTHTOKEN: ${NGROK_AUTHTOKEN}
-  #   depends_on:
-  #     kafka-broker:
-  #       condition: service_healthy
-  #     seaweedfs:
-  #       condition: service_started
-  #   volumes:
-  #     - ./ngrok.yml:/etc/ngrok.yml:ro
-  #   command:
-  #     - start
-  #     - --all
-  #     - --config
-  #     - /etc/ngrok.yml
-  #   networks:
-  #     - ngradar_website_network
-    
 
   kafka-broker:
     container_name: kafka-broker
@@ -500,11 +457,35 @@ services:
     networks:
       - ngradar_website_network
 
+# Consumes kafka messages and writes them to the database. 
+# This is a separate service from the UI consumer, which is only for sending messages to the front-end via SSE.
+# The UI consumer is part of the ngradar_website service, while this db_consumer is a separate service 
+# that runs in the background and writes to the database.
+  db_consumer:
+    build:
+      context: .
+      target: app
+    env_file:
+      - .env
+    profiles:
+      - kafka
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - ngradar_website_network
+    environment:
+      DB_KAFKA_TOPICS: "GBT_notif,VLBA_notif,DSOC_notif"
+      DB_KAFKA_GROUP_ID: "ngradar-db"
+      BOOTSTRAP_SERVER: "kafka-broker:29092"
+    command: >
+      python manage.py db_consumer
+
 
 
 
 #==========================
-# sim containers:
+# consumer sim containers:
 #==========================
 
   gbt:
@@ -603,6 +584,7 @@ services:
       - python
       - manage.py
       - vlba_sim
+
 
 
 

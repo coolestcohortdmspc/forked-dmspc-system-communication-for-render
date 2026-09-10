@@ -1,3 +1,5 @@
+from ast import For
+
 from django.db import models
 
 class Stations(models.IntegerChoices):
@@ -30,11 +32,29 @@ class Status(models.IntegerChoices):
 
 
 class Message(models.IntegerChoices):
-    VLBA_REQUEST_STORAGE = 1, "VLBA requests DSOC storage check."
-    DSOC_RESPOND_STORAGE = 2, "DSOC sends result from storage check."
+    VLBA_READY = 1, "VLBA is ready to transfer data."
+    VLBA_REQUEST_STORAGE = 2, "VLBA requests DSOC storage check."
     VLBA_TRANSFERRING = 3, "VLBA notifies DSOC that etransfer has started."
     VLBA_DELETE = 4, "DSOC gives VLBA green light to delete raw data."
-    GBT_TX = 5, "GBT is transmitting."
-    UI_EVENT = 6, "Submit Waveform from UI."
+    VLBA_FAILED = 5, "VLBA notifies DSOC that etransfer has failed."
+    DSOC_RESPOND_STORAGE = 6, "DSOC sends result from storage check."
+    GBT_TX = 7, "GBT is transmitting."
+    UI_EVENT = 8, "Submit Waveform from UI."
+    DB_COMMITTED = 9, "Database consumer committed event."
+    STATUS_UPDATE = 10, "Domain status update with no workflow action."
+        # STATUS_UPDATE is used for UI events that don't require any workflow action, but are still important to log in the database for historical purposes.
+        # For example, if the UI changes the status of a station to "Blocked" or "Ready", we want to log that event in the database even though it doesn't trigger any workflow actions.
+        # Also, these:
+        # status=Status.TRANSFERRED
+        # status=Status.VERIFYING
+        # status=Status.FAILED
 
-    # UI_EVENT = 5, "User input a new waveform."
+
+class UIEvent:
+    STATUS_CHANGED = "status_changed"
+    GBT_CHANGED = "gbt_changed"
+    VLBA_CHANGED = "vlba_changed"
+    DSOC_CHANGED = "dsoc_changed"
+    TRANSFER_CHANGED = "transfer_changed"
+    LATENCY_CHANGED = "latency_changed"
+    IMAGE_READY = "image_ready"

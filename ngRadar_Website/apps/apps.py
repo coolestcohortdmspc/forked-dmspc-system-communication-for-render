@@ -1,14 +1,23 @@
 from django.apps import AppConfig
-from django.db.models.signals import post_save
+import os
 
 class NgradarWebAppConfig(AppConfig):
     default_auto_field = "django.db.models.BigAutoField"
-    name = 'ngRadar_Website'
+    name = "ngRadar_Website"
 
     def ready(self):
-        from ngRadar_Website.models.models import dsocEvent, gbtEvent, ETransferEvent
-        from ngRadar_Website.signals import create_obsevent_from_gbt, create_obsevent_from_dsoc, create_obsevent_from_etransfer
+        if (
+            os.getenv(
+                "ENABLE_UI_KAFKA_CONSUMER",
+                "false",
+            ).lower()
+            != "true"
+        ):
+            return
+
+        from ngRadar_Website.ui_kafka import start_ui_kafka_consumer
+
+        start_ui_kafka_consumer()
         
-        post_save.connect(create_obsevent_from_gbt, sender=gbtEvent, weak=False)
-        post_save.connect(create_obsevent_from_dsoc, sender=dsocEvent, weak=False)
-        post_save.connect(create_obsevent_from_etransfer, sender=ETransferEvent, weak=False)
+
+
