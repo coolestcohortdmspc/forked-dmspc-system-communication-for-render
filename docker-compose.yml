@@ -594,70 +594,70 @@ services:
       - vlba_sim
   
 
-  vlba0:
+  vlba-sc:
     extends: vlba
     container_name: vlba-SC
     environment:
       STATION_NAME: SC
 
 
-  vlba1:
+  vlba-hn:
     extends: vlba
     container_name: vlba-HN
     environment:
       STATION_NAME: HN
   
 
-  vlba2:
+  vlba-nl:
     extends: vlba
     container_name: vlba-NL
     environment:
       STATION_NAME: NL
 
 
-  vlba3:
+  vlba-fd:
     extends: vlba
     container_name: vlba-FD
     environment:
       STATION_NAME: FD
 
   
-  vlba4:
+  vlba-la:
     extends: vlba
     container_name: vlba-LA
     environment:
       STATION_NAME: LA
 
 
-  vlba5:
+  vlba-pt:
     extends: vlba
     container_name: vlba-PT
     environment:
       STATION_NAME: PT
   
 
-  vlba6:
+  vlba-kp:
     extends: vlba
     container_name: vlba-KP
     environment:
       STATION_NAME: KP
 
 
-  vlba7:
+  vlba-ov:
     extends: vlba
     container_name: vlba-OV
     environment:
       STATION_NAME: OV
   
 
-  vlba8:
+  vlba-br:
     extends: vlba
     container_name: vlba-BR
     environment:
       STATION_NAME: BR
 
 
-  vlba9:
+  vlba-mk:
     extends: vlba
     container_name: vlba-MK
     environment:
