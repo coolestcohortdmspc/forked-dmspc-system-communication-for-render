@@ -94,7 +94,7 @@ def test_process_msg_GBT_TX(
                     status=Status.READY,
                     num_bytes=500,
                     filename=mock_frame_path.name,
-                    stations=Stations.PT,
+                    station=Stations.PT,
                     message=1,
                 )
 
@@ -158,7 +158,7 @@ def test_process_msg_GBT_TX_FAILED(
                     status=Status.FAILED,
                     num_bytes=0,
                     filename=mock_frame_path.name,
-                    stations=Stations.PT,
+                    station=Stations.PT,
                     message="Source file does not exist",
                 )
 #=====================================================================
@@ -198,7 +198,7 @@ def test_process_msg_DSOC_RESPOND_STORAGE(
         "filename": str("fake_filename.png"),
         "event_time": datetime(2026, 7, 15, 12, 0, 0, tzinfo=timezone.utc),
         "message": "Yes",
-        "stations": str("fake_station"),
+        "station": str("fake_station"),
     }
 
     mock_json.return_value = mock_payload
@@ -224,7 +224,7 @@ def test_process_msg_DSOC_RESPOND_STORAGE(
                     status=Status.TRANSFERRING,
                     num_bytes=2048,
                     filename="fake_filename.png",
-                    stations=Stations.PT,
+                    station=Stations.PT,
                     message="Hancock VLBA has started to send the data file to DSOC via e-transfer",
                 )    
     mock_etc_send.assert_called_once_with(Path("/raw_data/11111111-1111-1111-1111-111111111111.bin"))
@@ -268,7 +268,7 @@ def test_process_msg_DSOC_RESPOND_STORAGE_CalledProcessError(
         "filename": str("fake_filename.png"),
         "event_time": datetime(2026, 7, 15, 12, 0, 0, tzinfo=timezone.utc),
         "message": "Yes",
-        "stations": str("fake_station"),
+        "station": str("fake_station"),
     }
 
     mock_json.return_value = mock_payload
@@ -352,7 +352,7 @@ def test_process_msg_DSOC_RESPOND_STORAGE_OSError(
         "filename": str("fake_filename.png"),
         "event_time": datetime(2026, 7, 15, 12, 0, 0, tzinfo=timezone.utc),
         "message": "Yes",
-        "stations": str("fake_station"),
+        "station": str("fake_station"),
     }
 
     mock_json.return_value = mock_payload
@@ -373,7 +373,7 @@ def test_process_msg_DSOC_RESPOND_STORAGE_OSError(
                     status=Status.TRANSFERRING,
                     num_bytes=2048,
                     filename="fake_filename.png",
-                    stations=Stations.PT,
+                    station=Stations.PT,
                     message="Hancock VLBA has started to send the data file to DSOC via e-transfer",
                 )     
     mock_etc_send.assert_called_once_with(Path("/raw_data/11111111-1111-1111-1111-111111111111.bin"))
@@ -417,7 +417,7 @@ def test_process_msg_DSOC_RESPOND_STORAGE_No(
         "filename": str("fake_filename.png"),
         "event_time": datetime(2026, 7, 15, 12, 0, 0, tzinfo=timezone.utc),
         "message": 1, # Same as message being "No"
-        "stations": str("fake_station"),
+        "station": str("fake_station"),
     }
 
     mock_json.return_value = mock_payload
@@ -438,7 +438,7 @@ def test_process_msg_DSOC_RESPOND_STORAGE_No(
                     status=Status.READY,
                     num_bytes=2048,
                     filename="fake_filename.png",
-                    stations=Stations.PT,
+                    station=Stations.PT,
                     message=1,
                 )      
     assert mock_etc_send.call_count == 0

@@ -270,7 +270,7 @@ def test_process_msg_VLBA_REQUEST_STORAGE(
             "filename": str("fake_filename.png"),
             "event_time": datetime(2026, 7, 15, 12, 0, 0, tzinfo=timezone.utc),
             "message": 2,
-            "stations": str("fake_station"),
+            "station": str("fake_station"),
         }
 
     mock_json.return_value = mock_payload
@@ -296,7 +296,7 @@ def test_process_msg_VLBA_REQUEST_STORAGE(
                             status=1,
                             num_bytes=2048,
                             filename="fake_filename.png",
-                            stations=str("fake_station"),
+                            station=str("fake_station"),
                             message="Yes",
                         )
 #=====================================================================
@@ -341,7 +341,7 @@ def test_process_msg_VLBA_REQUEST_STORAGE_FAILED(
             "filename": str("fake_filename.png"),
             "event_time": datetime(2026, 7, 15, 12, 0, 0, tzinfo=timezone.utc),
             "message": 2,
-            "stations": str("fake_station"),
+            "station": str("fake_station"),
         }
 
     mock_json.return_value = mock_payload
@@ -401,7 +401,7 @@ def test_process_msg_VLBA_REQUEST_STORAGE_15(
             "filename": str("fake_filename.png"),
             "event_time": datetime(2026, 7, 15, 12, 0, 0, tzinfo=timezone.utc),
             "message": 15,
-            "stations": str("fake_station"),
+            "station": str("fake_station"),
         }
 
     mock_json.return_value = mock_payload
@@ -462,7 +462,7 @@ def test_process_msg_VLBA_REQUEST_STORAGE_1(
             "filename": str("fake_filename.png"),
             "event_time": datetime(2026, 7, 15, 12, 0, 0, tzinfo=timezone.utc),
             "message": 1,
-            "stations": str("fake_station"),
+            "station": str("fake_station"),
         }
 
     mock_json.return_value = mock_payload
@@ -488,7 +488,7 @@ def test_process_msg_VLBA_REQUEST_STORAGE_1(
                             status=1,
                             num_bytes=2048,
                             filename="fake_filename.png",
-                            stations=str("fake_station"),
+                            station=str("fake_station"),
                             message=2,
                         )
 
@@ -547,7 +547,7 @@ def test_process_msg_VLBA_TRANSFERRING(
             "filename": str("fake_filename.png"),
             "event_time": datetime(2026, 7, 15, 12, 0, 0, tzinfo=timezone.utc),
             "message": 2,
-            "stations": str("fake_station"),
+            "station": str("fake_station"),
         }
     
     #pretend that, given the fake uuid, this data is extracted from the DB:
@@ -609,7 +609,7 @@ def test_process_msg_VLBA_TRANSFERRING(
                     status=1,
                     num_bytes=2048,
                     filename="fake_filename.png",
-                    stations=str("fake_station"),
+                    station=str("fake_station"),
                     message="Processing complete. Delete your raw data.",
                 )
 #=====================================================================
@@ -665,7 +665,7 @@ def test_process_msg_VLBA_TRANSFERRING_verificationFAILED(
             "filename": str("fake_filename.png"),
             "event_time": datetime(2026, 7, 15, 12, 0, 0, tzinfo=timezone.utc),
             "message": 2,
-            "stations": str("fake_station"),
+            "station": str("fake_station"),
         }
 
     mock_json.return_value = mock_payload
@@ -742,7 +742,7 @@ def test_process_msg_VLBA_TRANSFERRING_processingFAILED(
             "filename": str("fake_filename.png"),
             "event_time": datetime(2026, 7, 15, 12, 0, 0, tzinfo=timezone.utc),
             "message": 2,
-            "stations": str("fake_station"),
+            "station": str("fake_station"),
         }
     
     #pretend that, given the fake uuid, this data is extracted from the DB:
@@ -841,7 +841,7 @@ def test_process_msg_VLBA_TRANSFERRING_trackingFAILED(
             "filename": str("fake_filename.png"),
             "event_time": datetime(2026, 7, 15, 12, 0, 0, tzinfo=timezone.utc),
             "message": 2,
-            "stations": str("fake_station"),
+            "station": str("fake_station"),
         }
 
     mock_json.return_value = mock_payload
@@ -915,7 +915,7 @@ def test_process_msg_VLBA_TRANSFERRING_image_falseFAILED(
             "filename": str("fake_filename.png"),
             "event_time": datetime(2026, 7, 15, 12, 0, 0, tzinfo=timezone.utc),
             "message": 2,
-            "stations": str("fake_station"),
+            "station": str("fake_station"),
         }
     
     #pretend that, given the fake uuid, this data is extracted from the DB:
@@ -1036,7 +1036,7 @@ def test_track_etransfer_progress(
     payload = {
         "transfer_uuid": "11111111-1111-1111-1111-111111111111",
         "num_bytes": 1000,
-        "stations": str("fake_station"),
+        "station": str("fake_station"),
     }
 
     incoming_file = MagicMock()
@@ -1098,7 +1098,7 @@ def test_track_etransfer_progress_status_FAILED(
     payload = {
         "transfer_uuid": "11111111-1111-1111-1111-111111111111",
         "num_bytes": 1000,
-        "stations": str("fake_station"),
+        "station": str("fake_station"),
     }
 
     incoming_file = MagicMock()
@@ -1140,7 +1140,7 @@ def test_track_etransfer_progress_status_OTHER(
     payload = {
         "transfer_uuid": "11111111-1111-1111-1111-111111111111",
         "num_bytes": 1000,
-        "stations": str("fake_station"),
+        "station": str("fake_station"),
     }
 
     incoming_file = MagicMock()

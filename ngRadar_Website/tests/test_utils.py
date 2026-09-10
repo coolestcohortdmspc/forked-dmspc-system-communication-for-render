@@ -884,7 +884,7 @@ def test_send_kafka_message(mock_datetime, mock_produce):
     status=Status.TRANSFERRING
     num_bytes=2048
     filename="mock.filename"
-    stations=Stations.GBT
+    station=Stations.GBT
     message=1
 
     mock_produce.return_value = None
@@ -902,16 +902,16 @@ def test_send_kafka_message(mock_datetime, mock_produce):
         status=status,
         num_bytes=num_bytes,
         filename=filename, 
-        stations=stations,
+        station=station,
         message=message,
     )
 
     mock_produce.assert_called_once_with(
-        stations,
+        station,
         producer_topic,
         producer_config,
         key,
-        f'{{"transfer_uuid": "test_transfer_uuid", "gbt_uuid": "test_gbt_uuid", "status": 4, "num_bytes": 2048, "filename": "mock.filename", "event_time": "2026-08-12T12:34:56+00:00", "message": 1, "stations": {stations}}}',
+        f'{{"transfer_uuid": "test_transfer_uuid", "gbt_uuid": "test_gbt_uuid", "status": 4, "num_bytes": 2048, "filename": "mock.filename", "event_time": "2026-08-12T12:34:56+00:00", "message": 1, "station": {station}}}',
     )
 
 
