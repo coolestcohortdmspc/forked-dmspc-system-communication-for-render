@@ -41,7 +41,7 @@ STATION = Stations.HN
 """
 Use this constant instead once Ty's docker changes are in:
 
-STATION_NAME = os.environ.get("SITE_NAME")
+STATION_NAME = os.environ.get("STATION_NAME")
 STATION = Stations[STATION_NAME]
 """
 
