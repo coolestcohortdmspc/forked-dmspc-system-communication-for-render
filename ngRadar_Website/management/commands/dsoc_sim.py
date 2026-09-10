@@ -162,7 +162,7 @@ def verify_incoming_transfer(
 def track_etransfer_progress(payload, incoming_file: Path):
     transfer_uuid = payload["transfer_uuid"] # syntax?
     num_bytes = payload["num_bytes"] # make this an int?
-    stations = payload["stations"] # make this an int?
+    station = payload["station"] # make this an int?
     received_bytes = 0
     write_transfer_progress( # resetting progress.json to zero so below logic doesn't read from previous run. Submit button does this too, but not on system-up :(
         received_bytes=0,
@@ -196,7 +196,7 @@ def track_etransfer_progress(payload, incoming_file: Path):
             break
 
         if time.monotonic() - last_progress_at > STALL_TIMEOUT_SECONDS:
-            if consumer_group_has_members(f"{stations.name.lower()}-consumer-group"):
+            if consumer_group_has_members(f"{station.name.lower()}-consumer-group"):
                 # vlba is alive, the transfer is just slow. Start the clock over.
                 last_progress_at = time.monotonic()
             else:
@@ -220,7 +220,7 @@ def track_etransfer_progress(payload, incoming_file: Path):
 def process_msg(msg, producer_topic, producer_config):
     incoming_key = int(msg.key().decode("utf-8"))
     payload = json.loads(msg.value().decode("utf-8"))
-    station = payload["stations"]
+    station = payload["station"]
     volume_folder = Path("/dsoc/incoming")
     
     if incoming_key == Message.VLBA_REQUEST_STORAGE.value:
@@ -278,7 +278,7 @@ def process_msg(msg, producer_topic, producer_config):
                         status=payload["status"],
                         num_bytes=payload["num_bytes"],
                         filename=payload["filename"],
-                        stations=station,
+                        station=station,
                         message=payload["message"]+1,
                     )
                     print(f"DSOC does not have enough storage to accept the data transfer request. The remaining disk space is {space_remaining:0.2f}GB and the incoming data is {expected_num_bytes/1000000000:0.2f}GB")
@@ -304,7 +304,7 @@ def process_msg(msg, producer_topic, producer_config):
                     status=payload["status"],
                     num_bytes=payload["num_bytes"],
                     filename=payload["filename"],
-                    stations=station,
+                    station=station,
                     message="Yes",
                 )
                 print("DSOC has enough storage to accept the incoming data. Awaiting e-transfer...")
@@ -416,7 +416,7 @@ def process_msg(msg, producer_topic, producer_config):
             status=payload["status"],
             num_bytes=payload["num_bytes"],
             filename=payload["filename"],
-            stations=station,
+            station=station,
             message="Processing complete. Delete your raw data.",
         )
         

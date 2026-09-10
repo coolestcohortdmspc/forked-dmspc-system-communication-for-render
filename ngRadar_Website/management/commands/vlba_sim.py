@@ -81,7 +81,7 @@ def process_msg(msg, producer_topic, producer_config):
                 status=Status.READY,
                 num_bytes=num_bytes,
                 filename=frame_path.name,
-                stations=STATION,
+                station=STATION,
                 message=1,
             )
             print("VLBA requesting DSOC check storage...")
@@ -96,7 +96,7 @@ def process_msg(msg, producer_topic, producer_config):
                 status=Status.FAILED,
                 num_bytes=0,
                 filename=frame_path.name,
-                stations=STATION,
+                station=STATION,
                 message="Source file does not exist",
             )
             print("Source file does not exist.")
@@ -137,7 +137,7 @@ def process_msg(msg, producer_topic, producer_config):
                         status=Status.TRANSFERRING,
                         num_bytes=payload["num_bytes"],
                         filename=payload["filename"],
-                        stations=STATION,
+                        station=STATION,
                         message="Hancock VLBA has started to send the data file to DSOC via e-transfer",
                     )
                     frame_path = raw_data_path / f"{payload['transfer_uuid']}.bin"
@@ -196,7 +196,7 @@ def process_msg(msg, producer_topic, producer_config):
                 status=Status.READY,
                 num_bytes=payload["num_bytes"],
                 filename=payload["filename"],
-                stations=STATION,
+                station=STATION,
                 message=payload["message"],
             )
 

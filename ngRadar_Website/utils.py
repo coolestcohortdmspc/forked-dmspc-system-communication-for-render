@@ -586,7 +586,7 @@ def send_kafka_message(
     status,
     num_bytes,
     filename,
-    stations,
+    station,
     message="",
 ):
     payload = {
@@ -597,11 +597,11 @@ def send_kafka_message(
         "filename": filename,
         "event_time": datetime.now(timezone.utc).isoformat(),
         "message": message,
-        "stations": stations,
+        "station": station,
     }
 
     produce(
-        stations,
+        station,
         producer_topic,
         producer_config,
         key,
