@@ -9,7 +9,7 @@ from django.views.decorators.http import require_POST, require_GET
 from django.http import StreamingHttpResponse, JsonResponse, HttpResponse, HttpResponseNotFound
 
 # serve_image imports
-from ngRadar_Website.utils import create_s3_client, bootstrap, write_transfer_progress, produce, publish_status_obsEvents # , get_presigned_url
+from ngRadar_Website.utils import create_s3_client, bootstrap, write_transfer_progress, produce, publish_status_obsEvents, send_kafka_message # , get_presigned_url
 from ngRadar_Website.enums import Stations, Message, Status
 
 #libraries used for lock status
@@ -200,6 +200,7 @@ def submit_waveform(request):
     if request.method == "POST":
         uuid_input = uuid.uuid4()
         waveform  = request.POST.get('waveform')
+        user = request.user.username
         timestamp = datetime.now(timezone.utc)
         # Database version
         ui_Event = uiEvent.objects.create(
@@ -208,34 +209,24 @@ def submit_waveform(request):
             event_time = timestamp
         )
 
-        # p = Path("../../../out/ngrok_endpoint.env")
-        # text = p.read_text().strip()
-
-        # bootstrap = None
-        # for line in text.splitlines():
-        #     if line.startswith("BOOTSTRAP_SERVER="):
-        #         bootstrap = line.split("=", 1)[1].strip()
-        #         break
-
-        # if not bootstrap:
-        #     raise RuntimeError("BOOTSTRAP_SERVER not found in /out/ngrok_endpoint.env")
-        
-        # bootstrap = ngrok_endpoint.objects.last().bootstrap
-
         topic, config = bootstrap(Stations.UI)
 
-        # Kafka version 
-        # topic = "user_input"
-        # config = {
-        #     "bootstrap.servers": bootstrap,
-        #     "message.max.bytes": 8388608,
-        #     "client.id": "ui-producer"}
-        # message = "User input a new waveform."
 
         def main():
-            key = str(Message.UI_EVENT)
-            value = uuid_input.hex  # Use the UUID as the value for the Kafka message
-            produce(topic, config, key, value)
+            # key = str(Message.UI_EVENT)
+            # value = uuid_input.hex  # Use the UUID as the value for the Kafka message
+            # produce(topic, config, key, value)
+            send_kafka_message(
+                key = str(Message.UI_EVENT), 
+                producer_topic=topic,
+                producer_config=config, 
+                transfer_uuid=0,
+                gbt_uuid=0,
+                status=0,
+                num_bytes=0,
+                filename="0",
+                message=f"User {user} submitted a waveform",
+            )
             write_transfer_progress(received_bytes=0, total_bytes=0, percent=0.0, transfer_id=0)  # Reset the progress bar after sending the message
         main()
         
