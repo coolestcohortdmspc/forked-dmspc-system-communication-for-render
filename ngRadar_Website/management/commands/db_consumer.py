@@ -1,11 +1,15 @@
-import json
+import json, os
 from ngRadar_Website.enums import Message
 from ngRadar_Website.models.models import ObservatoryEvent
 from ngRadar_Website.utils import (
+    MAX_BYTES,
     consume,
     produce,
 )
 from django.db import transaction
+from django.core.management.base import BaseCommand
+
+
 
 TOPIC_TO_UI_EVENT = {
     "GBT_notif": "gbt_changed",
@@ -159,3 +163,52 @@ def publish_db_committed(
         str(Message.DB_COMMITTED.value),
         json.dumps(notification),
     )
+
+
+
+
+class Command(BaseCommand):
+    help = "Consume Kafka domain events and persist them to ObservatoryEvent."
+
+    def handle(self, *args, **options):
+        topics = os.getenv(
+            "DB_KAFKA_TOPICS",
+            "GBT_notif,VLBA_notif,DSOC_notif",
+        ).split(",")
+
+        consumer_config = {
+            "bootstrap.servers": os.getenv(
+                "BOOTSTRAP_SERVER",
+                "kafka-broker:29092",
+            ),
+            "group.id": os.getenv(
+                "DB_KAFKA_GROUP_ID",
+                "ngradar-db",
+            ),
+            "auto.offset.reset": "earliest",
+            "enable.auto.commit": False,
+        }
+
+        producer_config = {
+            "bootstrap.servers": os.getenv(
+                "BOOTSTRAP_SERVER",
+                "kafka-broker:29092",
+            ),
+            "message.max.bytes": MAX_BYTES,
+            "message.timeout.ms": 2000,
+            "client.id": "db-consumer-producer",
+        }
+
+        self.stdout.write(
+            self.style.SUCCESS(
+                f"Starting DB consumer for topics: {topics}"
+            )
+        )
+
+        consume(
+            topics,
+            consumer_config,
+            process_msg,
+            producer_config=producer_config,
+            manual_commit=True,
+        )

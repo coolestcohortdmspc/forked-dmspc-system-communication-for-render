@@ -11,7 +11,7 @@ import asyncio
 from ngRadar_Website.sse import sse_broker
 
 # serve_image imports
-from ngRadar_Website.utils import create_s3_client, bootstrap, write_transfer_progress, produce, publish_status_obsEvents # , get_presigned_url
+from ngRadar_Website.utils import create_s3_client, bootstrap, write_transfer_progress, produce, send_kafka_message # , get_presigned_url
 from ngRadar_Website.enums import Stations, Message, Status
 
 #libraries used for lock status
@@ -20,6 +20,7 @@ from django.core.cache import cache
 from ngRadar_Website.models.models import ObservatoryEvent
 from django.contrib import messages
 from django.contrib.auth import authenticate, login, logout, logout
+from django.contrib.auth.decorators import login_not_required
 from django.db.models import Avg
 from datetime import datetime, timezone
 import logging
@@ -196,29 +197,72 @@ def latency_graphing(request):
 
 
 def serve_image(request, uuid):
-    try:
-        event = get_object_or_404(ObservatoryEvent, uuid=uuid)
+    event = get_object_or_404(
+        ObservatoryEvent,
+        uuid=uuid,
+    )
 
-        bucket = os.environ["WEED_S3_BUCKET"]
+    try:
+        bucket = os.environ[
+            "WEED_S3_BUCKET"
+        ]
 
         s3 = create_s3_client()
 
-        # presigned_url = get_presigned_url(s3, event)
-        # return redirect(presigned_url)
-
         obj = s3.get_object(
-        Bucket=bucket,
-        Key=event.image_key,
+            Bucket=bucket,
+            Key=event.image_key,
         )
 
         return HttpResponse(
             obj["Body"].read(),
             content_type=obj["ContentType"],
         )
-    except:
-        publish_status_obsEvents(
+
+    except Exception as exc:
+        (
+            producer_topic,
+            producer_config,
+            _,
+            _,
+        ) = bootstrap(
+            Stations.DSOC
+        )
+
+        send_kafka_message(
+            message_type=Message.STATUS_UPDATE,
+            producer_topic=producer_topic,
+            producer_config=producer_config,
+
+            station=Stations.DSOC,
             status=Status.FAILED,
-            msg="Failed to connect to SeaweedFS.",
+
+            gbt_uuid=event.gbt_uuid,
+            transfer_uuid=event.transfer_uuid,
+
+            object_id=event.object_id,
+            target=event.target,
+
+            tx_waveform=event.tx_waveform,
+            rec_waveform=event.rec_waveform,
+
+            product_type=event.product_type,
+            product_id=event.product_id,
+
+            image_key=event.image_key,
+
+            xmit_station=event.xmit_station,
+            rcvr_station=event.rcvr_station,
+
+            message=(
+                "Failed to retrieve DDM image "
+                f"from SeaweedFS: {exc}"
+            ),
+        )
+
+        return HttpResponse(
+            "Unable to retrieve image.",
+            status=503,
         )
 
 
@@ -315,6 +359,7 @@ def submit_waveform(request):
 # Render the templates
 #====================================================
 
+@login_not_required
 @cache_control(
     no_cache=True,
     must_revalidate=True,
