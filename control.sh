@@ -57,10 +57,11 @@ stop)
     #check if fastAPI process file exists. Stops and removes it if it does
     echo "Stopping FastAPI Service..."
     if [ -f "$FASTAPI_PID" ]; then
-        PID = $(cat "$FASTAPI_PID" )
+        PID=$(cat "$FASTAPI_PID")
         if kill "$PID" 2>/dev/null; then
         echo "Successfully Stopped FastAPI"
         rm "$FASTAPI_PID"
+        fi
     fi
     ;;
 

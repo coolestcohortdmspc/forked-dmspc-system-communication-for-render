@@ -57,6 +57,9 @@ Run these commands in your terminal to accomplish any of the following:
 
 ./control.sh agent-up       # If the gbt or vlba droplet's agent fails, start it up again with this command.
 ```
+# Stop the FastAPI Service if it fails to stop
+lsof -t -i tcp:8001 | xargs kill -9
+
 # Commands Within the Control Shell
 python3 manage.py migrate       # Retrieves the latest database migrations and applies them
 python3 manage.py makemigrations       # Creates new database changes
