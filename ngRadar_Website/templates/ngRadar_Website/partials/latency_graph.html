@@ -1,21 +1,9 @@
-<div class="Live_Latency_Graph" style="display:flex; justify-content:center; align-items:center">
-    <title>Live Graph</title>
-    <!-- Add JS Charts and Annotations Library -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
-    <canvas id="LatencyChart" width="1000" height="540"></canvas>
-    <style>
-        #LatencyChart {
-            background: #ffffff;
-            padding-left: 25px;
-            padding-right: 25px;
-            padding-top: 20px;
-            padding-bottom: 20px;
-        }
-    </style>
-    <!-- URL to views file still needs to be inside HTML for graph data to transmit data -->
-    <script>
-        window.Latency_SSE_URL = "{% url 'latency_graphing' %}"
-    </script>
-    <script src="../../../static/ngRadar_Website/js/latency_graph_script.js"></script>
+<div
+    class="Live_Latency_Graph"
+>
+    <canvas
+        id="LatencyChart"
+        width="1000"
+        height="540"
+    ></canvas>
 </div>

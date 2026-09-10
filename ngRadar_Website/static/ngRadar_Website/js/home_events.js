@@ -7,17 +7,18 @@ function dispatchRadarEvent(
 ) {
     let data = {};
 
-    if (event.data) {
-        try {
-            data = JSON.parse(
-                event.data
-            );
-        } catch (error) {
-            console.error(
-                `[SSE] Could not parse ${event.type} payload:`,
-                error
-            );
-        }
+    try {
+        data = JSON.parse(
+            event.data || "{}"
+        );
+
+    } catch (error) {
+        console.error(
+            `[SSE] Could not parse ${event.type}:`,
+            error
+        );
+
+        return;
     }
 
     console.log(
@@ -35,72 +36,44 @@ function dispatchRadarEvent(
     );
 }
 
-eventSource.addEventListener(
-    "status_changed",
-    (event) => {
-        dispatchRadarEvent(
-            "statusChanged",
-            event
-        );
-    }
-);
 
-eventSource.addEventListener(
-    "gbt_changed",
-    (event) => {
-        dispatchRadarEvent(
-            "gbtChanged",
-            event
-        );
-    }
-);
+const HOME_EVENTS = {
+    status_changed:
+        "statusChanged",
 
-eventSource.addEventListener(
-    "vlba_changed",
-    (event) => {
-        dispatchRadarEvent(
-            "vlbaChanged",
-            event
-        );
-    }
-);
+    gbt_changed:
+        "gbtChanged",
 
-eventSource.addEventListener(
-    "dsoc_changed",
-    (event) => {
-        dispatchRadarEvent(
-            "dsocChanged",
-            event
-        );
-    }
-);
+    vlba_changed:
+        "vlbaChanged",
 
-eventSource.addEventListener(
-    "transfer_changed",
-    (event) => {
-        dispatchRadarEvent(
-            "transferChanged",
-            event
-        );
-    }
-);
+    dsoc_changed:
+        "dsocChanged",
 
-eventSource.addEventListener(
-    "latency_changed",
-    (event) => {
-        dispatchRadarEvent(
-            "latencyChanged",
-            event
-        );
-    }
-);
+    transfer_changed:
+        "transferChanged",
 
-eventSource.addEventListener(
-    "image_ready",
-    (event) => {
-        dispatchRadarEvent(
-            "imageReady",
-            event
-        );
-    }
-);
+    latency_changed:
+        "latencyChanged",
+
+    image_ready:
+        "imageReady",
+};
+
+
+for (
+    const [
+        sseEvent,
+        browserEvent
+    ] of Object.entries(HOME_EVENTS)
+) {
+    eventSource.addEventListener(
+        sseEvent,
+        (event) => {
+            dispatchRadarEvent(
+                browserEvent,
+                event
+            );
+        }
+    );
+}

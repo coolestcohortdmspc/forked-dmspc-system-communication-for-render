@@ -29,3 +29,13 @@ window.eventSource.addEventListener(
         }
     }
 );
+
+// Close the SSE connection when navigating away.
+window.addEventListener(
+    "pagehide",
+    () => {
+        if (window.eventSource) {
+            window.eventSource.close();
+        }
+    }
+);

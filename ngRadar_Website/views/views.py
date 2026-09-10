@@ -1,89 +1,222 @@
-# auth imports
-from django.contrib.auth import authenticate, login, logout
-from django.contrib.auth.decorators import login_required
-from django.shortcuts import redirect, render, get_object_or_404
-from django.views.decorators.cache import cache_control
-from django.views.decorators.http import require_POST, require_GET
-
-# For SSE streaming
-from django.http import StreamingHttpResponse, JsonResponse, HttpResponse, HttpResponseNotFound
 import asyncio
-from ngRadar_Website.sse import sse_broker
-
-# serve_image imports
-from ngRadar_Website.utils import create_s3_client, bootstrap, write_transfer_progress, produce, send_kafka_message # , get_presigned_url
-from ngRadar_Website.enums import Stations, Message, Status
-
-#libraries used for lock status
-from django.core.cache import cache
-
-from ngRadar_Website.models.models import ObservatoryEvent
-from django.contrib import messages
-from django.contrib.auth import authenticate, login, logout, logout
-from django.contrib.auth.decorators import login_not_required
-from django.db.models import Avg
-from datetime import datetime, timezone
+import json
 import logging
-from ngRadar_Website.utils import produce
-import json, uuid, os, time
+import os
+import time
+
+from datetime import datetime, timezone
+
+from django.contrib import messages
+from django.contrib.auth import authenticate, login, logout
+from django.contrib.auth.decorators import login_not_required
+from django.core.cache import cache
+from django.db.models import Avg
+from django.http import (
+    HttpResponse,
+    HttpResponseNotFound,
+    JsonResponse,
+    StreamingHttpResponse,
+)
+from django.shortcuts import (
+    get_object_or_404,
+    redirect,
+    render,
+)
+from django.views.decorators.cache import cache_control
+from django.views.decorators.http import require_GET, require_POST
+
+from ngRadar_Website.enums import Message, Stations, Status
+from ngRadar_Website.models.models import ObservatoryEvent
+from ngRadar_Website.sse import sse_broker
+from ngRadar_Website.utils import (
+    bootstrap,
+    create_s3_client,
+    send_kafka_message,
+    write_transfer_progress,
+)
 
 
-#program constants
-RECORDS_TO_DISPLAY=30
+logger = logging.getLogger(__name__)
+
+
+# ============================================================
+# Constants
+# ============================================================
+
+RECORDS_TO_DISPLAY = 30
 LAST_RECORDS = 5
-EXPIRE_TIME_SECONDS = 3600
 
-def get_obs_events():
-    """Helper function to keep data uniform across view updates"""
+PROGRESS_JSON_PATH = "/service/mock_assets/progress.json"
 
-    latest_events = ObservatoryEvent.objects.order_by(
-        "-event_time",
-        "-uuid",
-        )[:RECORDS_TO_DISPLAY]
-    ui_events = uiEvent.objects.order_by("-event_time")[:LAST_RECORDS]
-    gbt_events = gbtEvent.objects.order_by("-event_time")[:LAST_RECORDS]
-    dsoc_events = dsocEvent.objects.order_by("-event_time")[:LAST_RECORDS]
-    avg_latency = latest_events.aggregate(Avg('latency_ms'))['latency_ms__avg'] or 0
-    current_waveform = ui_events.first().selected_waveform if ui_events.exists() else None
-    latest_etr_events = ETransferEvent.objects.order_by("-event_time")[:RECORDS_TO_DISPLAY]
-    current_transfer_uuid = latest_events.first().transfer_uuid if latest_events.exists() else None
-    latest_etr_event = ETransferEvent.objects.filter(transfer_uuid=current_transfer_uuid).order_by("-event_time").first()
-    latest_image_event = (
-            ObservatoryEvent.objects
-            .exclude(image_key__isnull=True)
-            .exclude(image_key="")
-            .order_by("-event_time")
-            .first()
-        )
 
-    # More than one TRANSFERRING row for a transfer means it was interrupted and resumed.
-    transferring_count = ETransferEvent.objects.filter(
-        transfer_uuid=current_transfer_uuid, status=Status.TRANSFERRING
-    ).count()
+# ============================================================
+# ObservatoryEvent query helpers
+# ============================================================
+
+def get_latest_station_event(station):
+    """
+    Return the latest persisted ObservatoryEvent for a station.
+    Used only to establish initial page state.
+    """
+
+    return (
+        ObservatoryEvent.objects
+        .filter(station=station)
+        .order_by("-event_time", "-uuid")
+        .first()
+    )
+
+
+def get_latest_image_event():
+    """
+    Return the most recent event with a SeaweedFS image.
+    """
+
+    return (
+        ObservatoryEvent.objects
+        .exclude(image_key__isnull=True)
+        .exclude(image_key="")
+        .order_by("-event_time", "-uuid")
+        .first()
+    )
+
+
+def get_current_waveform():
+    """
+    Return the most recently submitted waveform.
+
+    UI_EVENT messages are now persisted to ObservatoryEvent
+    by db_consumer, so there is no longer a uiEvent table.
+    """
+
+    event = (
+        ObservatoryEvent.objects
+        .filter(station=Stations.UI)
+        .exclude(tx_waveform__isnull=True)
+        .order_by("-event_time", "-uuid")
+        .first()
+    )
+
+    return event.tx_waveform if event else None
+
+
+def get_home_context():
+    """
+    Initial/fallback state for home.html.
+
+    After initial page load, live operational updates should
+    arrive through Kafka -> UI consumer -> SSE.
+    """
+
+    latest_event = (
+        ObservatoryEvent.objects
+        .order_by("-event_time", "-uuid")
+        .first()
+    )
 
     return {
-        'latest_events': latest_events,
-        'latest_event': ObservatoryEvent.objects.order_by("-event_time").first() if latest_events else None,
-        'ui_event': ui_events.first() if ui_events else None,
-        'gbt_event': gbt_events.first() if gbt_events else None,
-        'dsoc_event': dsoc_events.first() if dsoc_events else None,
-        'avg_latency': round(avg_latency, 2),
-        'current_waveform': current_waveform,
-        'latest_etr_events': latest_etr_events,
-        'transfer_resumed': transferring_count > 1,
-        'latest_etr_event': latest_etr_event,
-        'latest_image_event': latest_image_event,
+        "latest_event": latest_event,
+        "ui_event": get_latest_station_event(Stations.UI),
+        "gbt_event": get_latest_station_event(Stations.GBT),
+        "vlba_event": get_latest_station_event(Stations.HN),
+        "dsoc_event": get_latest_station_event(Stations.DSOC),
+        "current_waveform": get_current_waveform(),
+        "latest_image_event": get_latest_image_event(),
     }
 
 
+def get_dashboard_context():
+    """
+    Persisted history for dashboard.html.
+
+    ObservatoryEvent is the only source of truth here.
+    """
+
+    latest_events = list(
+        ObservatoryEvent.objects
+        .order_by("-event_time", "-uuid")
+        [:RECORDS_TO_DISPLAY]
+    )
+
+    avg_latency = (
+        ObservatoryEvent.objects
+        .exclude(latency_ms=0)
+        .aggregate(avg=Avg("latency_ms"))
+        ["avg"]
+        or 0
+    )
+
+    latest_event = (
+        latest_events[0]
+        if latest_events
+        else None
+    )
+
+    current_transfer_uuid = (
+        latest_event.transfer_uuid
+        if latest_event
+        else None
+    )
+
+    transfer_events = []
+
+    if current_transfer_uuid:
+        transfer_events = list(
+            ObservatoryEvent.objects
+            .filter(
+                transfer_uuid=current_transfer_uuid
+            )
+            .order_by("-event_time", "-uuid")
+        )
+
+    transferring_count = (
+        ObservatoryEvent.objects
+        .filter(
+            transfer_uuid=current_transfer_uuid,
+            status=Status.TRANSFERRING,
+        )
+        .count()
+        if current_transfer_uuid
+        else 0
+    )
+
+    return {
+        "latest_events": latest_events,
+        "latest_event": latest_event,
+        "avg_latency": round(avg_latency, 2),
+        "current_waveform": get_current_waveform(),
+        "latest_image_event": get_latest_image_event(),
+        "transfer_events": transfer_events,
+        "transfer_resumed": transferring_count > 1,
+    }
+
+
+# ============================================================
+# Main Kafka -> browser SSE stream
+# ============================================================
+
 async def sse_stream(request):
+    """
+    Single browser SSE connection.
+
+    Events are published here by the website Kafka consumer.
+
+    Examples:
+        gbt_changed
+        vlba_changed
+        dsoc_changed
+        status_changed
+        observatory_event_created
+        heartbeat
+    """
+
     subscriber = sse_broker.subscribe()
     _, queue = subscriber
 
     async def event_generator():
         try:
-            # Tell EventSource to wait 3 seconds before reconnecting
-            # after a dropped connection.
+            # Browser should reconnect after 3 seconds
+            # if connection is interrupted.
             yield "retry: 3000\n\n"
 
             while True:
@@ -94,7 +227,10 @@ async def sse_stream(request):
                     )
 
                     event_type = event["type"]
-                    event_data = event.get("data", {})
+                    event_data = event.get(
+                        "data",
+                        {},
+                    )
 
                     yield (
                         f"event: {event_type}\n"
@@ -102,8 +238,6 @@ async def sse_stream(request):
                     )
 
                 except asyncio.TimeoutError:
-                    # Nothing came from Kafka for 15 seconds.
-                    # Keep the HTTP connection alive.
                     heartbeat = {
                         "timestamp": (
                             datetime.now(timezone.utc)
@@ -117,11 +251,14 @@ async def sse_stream(request):
                     )
 
         except asyncio.CancelledError:
-            # Browser closed/reloaded/navigated away.
+            # Browser navigated away, refreshed,
+            # or closed the connection.
             raise
 
         finally:
-            sse_broker.unsubscribe(subscriber)
+            sse_broker.unsubscribe(
+                subscriber
+            )
 
     response = StreamingHttpResponse(
         event_generator(),
@@ -134,24 +271,39 @@ async def sse_stream(request):
     return response
 
 
-def get_Message_Latency():
-    database_events = (
+# ============================================================
+# Latency data
+# ============================================================
+
+@require_GET
+def latency_data(request):
+    """
+    Return persisted latency history.
+
+    This does NOT need its own SSE connection.
+
+    dashboard.html can request this endpoint whenever it receives
+    observatory_event_created over the main SSE connection.
+    """
+
+    events = list(
         ObservatoryEvent.objects
         .exclude(tx_waveform="Tx_OFF")
-        .order_by("-event_time")[:RECORDS_TO_DISPLAY]
+        .exclude(latency_ms=0)
+        .order_by("-event_time")
+        [:RECORDS_TO_DISPLAY]
     )
 
-    # so it will read left to right in the graph, we need to reverse the order of the events
-    latest_events = list(reversed(database_events))
+    # Graph should read oldest -> newest.
+    events.reverse()
 
-    latency_array = []
-    event_source_array = []
-    event_metadata_array = []
+    data = {
+        "latency_array": [],
+        "event_source_array": [],
+        "event_metadata_array": [],
+    }
 
-    for event in latest_events:
-        latency_array.append(round(event.latency_ms, 3))
-
-
+    for event in events:
         station_short = (
             Stations(event.station).name
             if event.station is not None
@@ -164,43 +316,55 @@ def get_Message_Latency():
             else "Unknown"
         )
 
-        event_source_array.append(station_short)
+        data["latency_array"].append(
+            round(event.latency_ms, 3)
+        )
 
-        event_metadata_array.append({
+        data["event_source_array"].append(
+            station_short
+        )
+
+        data["event_metadata_array"].append({
             "station": station_full,
             "status": (
                 event.get_status_display()
                 if event.status is not None
                 else "-"
             ),
-            "time": event.event_time.strftime("%Y-%m-%d %H:%M:%S"),
-            "object_id": event.object_id or "-",
-            "target": event.target or "-",
+            "time": (
+                event.event_time.strftime(
+                    "%Y-%m-%d %H:%M:%S"
+                )
+                if event.event_time
+                else "-"
+            ),
+            "object_id": (
+                event.object_id
+                or "-"
+            ),
+            "target": (
+                event.target
+                or "-"
+            ),
         })
 
-    data_to_send = {
-        "latency_array": latency_array,
-        "event_source_array": event_source_array,
-        "event_metadata_array": event_metadata_array,
-    }
-
-    yield f"data: {json.dumps(data_to_send)}\n\n"
+    return JsonResponse(data)
 
 
-def latency_graphing(request):
-    response = StreamingHttpResponse(
-        get_Message_Latency(),
-        content_type="text/event-stream; charset=utf-8"
-    )
-    response["Cache-Control"] = "no-cache"
-    return response
-
+# ============================================================
+# SeaweedFS image serving
+# ============================================================
 
 def serve_image(request, uuid):
     event = get_object_or_404(
         ObservatoryEvent,
         uuid=uuid,
     )
+
+    if not event.image_key:
+        return HttpResponseNotFound(
+            "Image not available."
+        )
 
     try:
         bucket = os.environ[
@@ -216,10 +380,18 @@ def serve_image(request, uuid):
 
         return HttpResponse(
             obj["Body"].read(),
-            content_type=obj["ContentType"],
+            content_type=obj.get(
+                "ContentType",
+                "image/png",
+            ),
         )
 
     except Exception as exc:
+        logger.exception(
+            "Failed to retrieve image "
+            "from SeaweedFS."
+        )
+
         (
             producer_topic,
             producer_config,
@@ -266,98 +438,151 @@ def serve_image(request, uuid):
         )
 
 
+# ============================================================
+# Waveform submission lock
+# ============================================================
 
-
-# Function for lock down user
-# Return True if event time is greater than lock time 
-# Othere wise False  
+@require_GET
 def lock_status(request):
-    logger = logging.getLogger(__name__)
-    try:
-        # UNCOMMENT TO TEST GRACEFUL FAILURE:
-        #raise Exception("TEST CACHE FAILURE")
+    """
+    Submission lock fallback endpoint.
 
-        lock_time = cache.get('submit_locked', None)
+    A submission remains locked until a DSOC COMPLETED
+    ObservatoryEvent occurs after the lock was created.
+
+    The browser can also unlock immediately from live SSE.
+    """
+
+    try:
+        lock_time = cache.get(
+            "submit_locked"
+        )
+
         if lock_time is None:
-            return JsonResponse({"locked": False,
-                                 "error": False})
-        elif dsocEvent.objects.filter(event_time__gt=lock_time).exists():
-            cache.delete('submit_locked')
-            return JsonResponse({'locked':False,
-                                 "error": False})
-        return JsonResponse({'locked':True,
-                             "error": False})
-    except Exception as e:
-        logger.error(f"Cache unavailable while checking submit lock: {e}")
+            return JsonResponse({
+                "locked": False,
+                "error": False,
+            })
+
+        observation_completed = (
+            ObservatoryEvent.objects
+            .filter(
+                station=Stations.DSOC,
+                status=Status.COMPLETED,
+                event_time__gt=lock_time,
+            )
+            .exists()
+        )
+
+        if observation_completed:
+            cache.delete(
+                "submit_locked"
+            )
+
+            return JsonResponse({
+                "locked": False,
+                "error": False,
+            })
 
         return JsonResponse({
             "locked": True,
-            "error": True,
-            "message": "Unable to determine lock status."
-        }, status=503)
+            "error": False,
+        })
+
+    except Exception as exc:
+        logger.exception(
+            "Unable to determine "
+            "waveform submission lock."
+        )
+
+        return JsonResponse(
+            {
+                "locked": True,
+                "error": True,
+                "message": (
+                    "Unable to determine "
+                    "lock status."
+                ),
+            },
+            status=503,
+        )
 
 
+# ============================================================
+# UI -> Kafka waveform submission
+# ============================================================
+
+@require_POST
 def submit_waveform(request):
-    if request.method == "POST":
-        event_uuid = uuid.uuid4()
-        waveform = request.POST.get("waveform")
-        timestamp = datetime.now(timezone.utc)
+    """
+    User waveform submission.
 
-        topic, config = bootstrap(Stations.UI)
+    No uiEvent database write occurs here.
 
-        payload = {
-            "event_uuid": str(event_uuid),
-            "gbt_uuid": None,
-            "transfer_uuid": None,
+    UI -> GBT_notif -> GBT
+    """
 
-            "station": int(Stations.UI),
-            "station_name": Stations.UI.label,
+    waveform = request.POST.get(
+        "waveform"
+    )
 
-            "tx_waveform": waveform,
-            "rec_waveform": waveform,
-
-            "status": None,
-            "object_id": None,
-            "target": None,
-
-            "xmit_station": None,
-            "rcvr_station": None,
-
-            "num_bytes": 0,
-            "latency_ms": 0.0,
-            "image_key": None,
-
-            "message": (
-                f"User submitted waveform {waveform}."
-            ),
-
-            "event_time": timestamp.isoformat(),
-        }
-
-        produce(
-            topic,
-            config,
-            str(Message.UI_EVENT.value),
-            json.dumps(payload),
+    if not waveform:
+        messages.error(
+            request,
+            "Waveform is required.",
         )
 
-        write_transfer_progress(
-            received_bytes=0,
-            total_bytes=0,
-            percent=0.0,
-            transfer_id=0,
+        return redirect("home")
+
+    producer_topic, producer_config = (
+        bootstrap(Stations.UI)
+    )
+
+    event_uuid = send_kafka_message(
+        message_type=Message.UI_EVENT,
+
+        producer_topic=producer_topic,
+        producer_config=producer_config,
+
+        station=Stations.UI,
+
+        tx_waveform=waveform,
+        rec_waveform=waveform,
+
+        message=(
+            f"User submitted waveform "
+            f"{waveform}."
+        ),
+    )
+
+    if event_uuid is None:
+        messages.error(
+            request,
+            "Unable to submit waveform.",
         )
 
-        cache.set(
-            "submit_locked",
-            datetime.now(timezone.utc),
-        )
+        return redirect("home")
+
+    # Existing e-transfer progress implementation.
+    # This can eventually move to Kafka too.
+    write_transfer_progress(
+        received_bytes=0,
+        total_bytes=0,
+        percent=0.0,
+        transfer_id=0,
+    )
+
+    cache.set(
+        "submit_locked",
+        datetime.now(timezone.utc),
+    )
 
     return redirect("home")
 
-#====================================================
-# Render the templates
-#====================================================
+
+# ============================================================
+# Authentication
+# ============================================================
 
 @login_not_required
 @cache_control(
@@ -371,8 +596,13 @@ def login_view(request):
         return redirect("home")
 
     if request.method == "POST":
-        username_input = request.POST["username"]
-        password_input = request.POST["password"]
+        username_input = request.POST[
+            "username"
+        ]
+
+        password_input = request.POST[
+            "password"
+        ]
 
         user = authenticate(
             request,
@@ -381,7 +611,11 @@ def login_view(request):
         )
 
         if user is not None:
-            login(request, user)
+            login(
+                request,
+                user,
+            )
+
             return redirect("home")
 
         messages.error(
@@ -398,141 +632,283 @@ def login_view(request):
 @require_POST
 def logout_view(request):
     logout(request)
+
     return redirect("login")
 
 
-@cache_control(no_cache=True, must_revalidate=True, no_store=True, max_age=0)
-@login_required
+# ============================================================
+# Full-page views
+# ============================================================
+
+@cache_control(
+    no_cache=True,
+    must_revalidate=True,
+    no_store=True,
+    max_age=0,
+)
 def home_view(request):
+    """
+    Initial Home render.
 
-    response = render(request, "ngRadar_Website/home.html", get_obs_events())
-    return response
+    DB provides initial/fallback state.
+    Kafka/SSE provides live updates after page load.
+    """
+
+    return render(
+        request,
+        "ngRadar_Website/home.html",
+        get_home_context(),
+    )
 
 
-@cache_control(no_cache=True, must_revalidate=True, no_store=True, max_age=0)
-@login_required
+@cache_control(
+    no_cache=True,
+    must_revalidate=True,
+    no_store=True,
+    max_age=0,
+)
 def dashboard_view(request):
+    """
+    Dashboard represents persisted ObservatoryEvent history.
+    """
 
-    response = render(request, "ngRadar_Website/dashboard.html", get_obs_events())
-    return response
+    return render(
+        request,
+        "ngRadar_Website/dashboard.html",
+        get_dashboard_context(),
+    )
 
 
-@login_required
+# ============================================================
+# HTMX partials
+# ============================================================
+
+@require_GET
 def event_table_partial(request):
-    # this is the partial template view for updating the observatory events table
-    return render(
-        request,
-        "ngRadar_Website/partials/dashboard_updates.html",
-        get_obs_events(),
-    )
+    """
+    Refresh after observatory_event_created SSE event.
 
-
-@login_required
-def status_partial(request):
-    # this is the partial template view for the status box on the home page
+    This reads committed ObservatoryEvent rows only.
+    """
 
     return render(
         request,
-        "ngRadar_Website/partials/status_partial.html",
-        get_obs_events(),
+        (
+            "ngRadar_Website/"
+            "partials/dashboard_updates.html"
+        ),
+        get_dashboard_context(),
     )
 
 
-@login_required
-def dsoc_event_partial(request):
-    # this is the partial template view for latest dsoc event image on home page
 
-    return render(
-        request,
-        "ngRadar_Website/partials/dsoc_home_partial.html",
-        get_obs_events(),
-    )
+# ============================================================
+# e-transfer progress SSE
+# ============================================================
 
-
-@login_required
-def gbt_event_partial(request):
-    # this is the partial template view for latest gbt event data on home page
-    return render(
-        request,
-        "ngRadar_Website/partials/gbt_home_partial.html",
-        get_obs_events(),
-    )
-
-
-PROGRESS_JSON_PATH = "/service/mock_assets/progress.json"  # <-- endpoint to stream to front end for progress bar. progress.json is updated by etc_send() while the VLBA e-transfer is occurring.
-
-@login_required
 @require_GET
 def progress_sse(request):
-    if not os.path.exists(PROGRESS_JSON_PATH):
-        return HttpResponseNotFound("Progress file not found")
+    """
+    Existing file-based e-transfer progress stream.
 
-    def sse(event=None, data=None):
-        out = ""
+    This is independent of the main Kafka/SSE event stream.
+
+    Future improvement:
+        publish transfer progress through Kafka and remove
+        progress.json + this second SSE connection.
+    """
+
+    if not os.path.exists(
+        PROGRESS_JSON_PATH
+    ):
+        return HttpResponseNotFound(
+            "Progress file not found"
+        )
+
+    def format_sse(
+        event=None,
+        data=None,
+    ):
+        output = ""
+
         if event:
-            out += f"event: {event}\n"
-        if data is not None:
-            out += f"data: {data}\n"
-        return out + "\n"
+            output += (
+                f"event: {event}\n"
+            )
 
-    def gen():
-        last_seen = None  # last full progress payload
-        last_transfer_id = None
+        if data is not None:
+            output += (
+                f"data: {data}\n"
+            )
+
+        return output + "\n"
+
+    def event_generator():
+        last_seen = None
+        completed_transfer_id = None
 
         while True:
-            if not os.path.exists(PROGRESS_JSON_PATH):
+            if not os.path.exists(
+                PROGRESS_JSON_PATH
+            ):
                 time.sleep(0.5)
                 continue
 
             try:
-                with open(PROGRESS_JSON_PATH, "r", encoding="utf-8") as f:
-                    payload = json.load(f)
+                with open(
+                    PROGRESS_JSON_PATH,
+                    "r",
+                    encoding="utf-8",
+                ) as progress_file:
+                    payload = json.load(
+                        progress_file
+                    )
 
-                received = payload.get("received_bytes", 0)
-                total = payload.get("total_bytes", 0)
-                percent = payload.get("percent", 0.0)
-                transfer_id = payload.get("transfer_id", 0)
+                received = payload.get(
+                    "received_bytes",
+                    0,
+                )
 
-                # Always emit when the payload changes (or transfer changes)
+                total = payload.get(
+                    "total_bytes",
+                    0,
+                )
+
+                percent = payload.get(
+                    "percent",
+                    0.0,
+                )
+
+                transfer_id = payload.get(
+                    "transfer_id",
+                    0,
+                )
+
                 if payload != last_seen:
                     last_seen = payload
-                    yield sse(data=json.dumps({
-                        "received": received,
-                        "total": total,
-                        "percent": percent,
-                        "transfer_id": transfer_id,
-                    }))
 
-                # Emit a done event, but DO NOT break/close the stream
-                if total > 0 and received >= total:
-                    # Only emit done once per transfer_id
-                    if transfer_id != last_transfer_id:
-                        last_transfer_id = transfer_id
-                        yield sse(event="done", data=json.dumps({
-                            "transfer_id": transfer_id,
+                    yield format_sse(
+                        data=json.dumps({
+                            "received": received,
+                            "total": total,
                             "percent": percent,
-                        }))
-                    # Wait for next transfer start (transfer_id changes)
-                    while True:
-                        time.sleep(0.5)
-                        if not os.path.exists(PROGRESS_JSON_PATH):
-                            continue
-                        with open(PROGRESS_JSON_PATH, "r", encoding="utf-8") as f:
-                            payload2 = json.load(f)
-                        next_transfer_id = payload2.get("transfer_id", 0)
-                        if next_transfer_id != transfer_id:
-                            last_seen = None
-                            break
+                            "transfer_id": (
+                                transfer_id
+                            ),
+                        })
+                    )
 
-            except Exception as e:
-                yield sse(event="progress_error", data=json.dumps({"message": str(e)}))
+                if (
+                    total > 0
+                    and received >= total
+                    and transfer_id
+                    != completed_transfer_id
+                ):
+                    completed_transfer_id = (
+                        transfer_id
+                    )
+
+                    yield format_sse(
+                        event="done",
+                        data=json.dumps({
+                            "transfer_id": (
+                                transfer_id
+                            ),
+                            "percent": percent,
+                        }),
+                    )
+
+            except Exception as exc:
+                logger.exception(
+                    "Unable to read "
+                    "e-transfer progress."
+                )
+
+                yield format_sse(
+                    event="progress_error",
+                    data=json.dumps({
+                        "message": str(exc)
+                    }),
+                )
 
             time.sleep(0.2)
 
     response = StreamingHttpResponse(
-        gen(),
+        event_generator(),
         content_type="text/event-stream",
     )
+
     response["Cache-Control"] = "no-cache"
     response["X-Accel-Buffering"] = "no"
+
     return response
+
+
+# ============================================================
+# latency graph 
+# ============================================================
+@require_GET
+def latency_data(request):
+    database_events = (
+        ObservatoryEvent.objects
+        .exclude(tx_waveform="Tx_OFF")
+        .order_by("-event_time")
+        [:RECORDS_TO_DISPLAY]
+    )
+
+    latest_events = list(
+        reversed(database_events)
+    )
+
+    latency_array = []
+    event_source_array = []
+    event_metadata_array = []
+
+    for event in latest_events:
+        latency_array.append(
+            round(event.latency_ms, 3)
+        )
+
+        station_short = (
+            Stations(event.station).name
+            if event.station is not None
+            else "Unknown"
+        )
+
+        station_full = (
+            event.get_station_display()
+            if event.station is not None
+            else "Unknown"
+        )
+
+        event_source_array.append(
+            station_short
+        )
+
+        event_metadata_array.append({
+            "station": station_full,
+            "status": (
+                event.get_status_display()
+                if event.status is not None
+                else "-"
+            ),
+            "time": (
+                event.event_time.strftime(
+                    "%Y-%m-%d %H:%M:%S"
+                )
+            ),
+            "object_id": (
+                event.object_id or "-"
+            ),
+            "target": (
+                event.target or "-"
+            ),
+        })
+
+    return JsonResponse({
+        "latency_array": latency_array,
+        "event_source_array":
+            event_source_array,
+        "event_metadata_array":
+            event_metadata_array,
+    })

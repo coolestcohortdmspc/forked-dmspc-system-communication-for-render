@@ -1,19 +1,24 @@
 const eventSource = window.eventSource;
 
+
 eventSource.addEventListener(
     "observatory_event_created",
     (event) => {
-        let data = {};
+        let data;
 
         try {
             data = JSON.parse(
                 event.data
             );
+
         } catch (error) {
             console.error(
-                "[SSE] Could not parse observatory event:",
+                "[SSE] Could not parse "
+                + "observatory event:",
                 error
             );
+
+            return;
         }
 
         console.log(

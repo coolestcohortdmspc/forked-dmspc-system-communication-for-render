@@ -1,49 +1,96 @@
 {% extends 'ngRadar_Website/base.html' %}
 {% load static %}
 
-{% block title %}History Events Table{% endblock %}
+{% block title %}
+    History Events Table
+{% endblock %}
+
 
 {% block content %}
 
 <div
-    class="dashboard-wrapper d-flex flex-column min-vh-100"
+    class="dashboard-wrapper d-flex flex-column"
     data-color-mode="SDS-light"
 >
 
-    <script>
-        window.addEventListener('pageshow', function (event) {
-            if (event.persisted) {
-                window.location.reload();
-            }
-        });
-    </script>
+    <!-- ================================================= -->
+    <!-- Persisted ObservatoryEvent history -->
+    <!-- ================================================= -->
 
     <main class="flex-grow-0 container-fluid px-4 pt-4 pb-10">
 
         <div
             id="dashboard-content"
+
             hx-get="{% url 'event_table_update' %}"
-            hx-trigger="observatoryEventCreated from:body"
+
+            hx-trigger="
+                observatoryEventCreated from:body
+            "
+
             hx-target="#dashboard-content"
+
             hx-swap="innerHTML"
+
             class="w-100"
         >
+
             {% include 'ngRadar_Website/partials/dashboard_updates.html' %}
+
         </div>
 
     </main>
 
-    <div class="Chart_padding" style="padding-top: 30px;"></div>
+
+    <!-- ================================================= -->
+    <!-- Latency graph -->
+    <!-- ================================================= -->
+
+    <div
+        class="Chart_padding"
+        style="padding-top: 30px;"
+    ></div>
 
     {% include 'ngRadar_Website/partials/latency_graph.html' %}
 
 </div>
+
+
+<script>
+    window.addEventListener(
+        "pageshow",
+        function (event) {
+            if (event.persisted) {
+                window.location.reload();
+            }
+        }
+    );
+</script>
 
 {% endblock %}
 
 
 {% block scripts %}
 
-<script src="{% static 'ngRadar_Website/js/history_events.js' %}"></script>
+<script
+    src="https://cdn.jsdelivr.net/npm/chart.js"
+></script>
+
+<script
+    src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"
+></script>
+
+<script>
+    window.LATENCY_DATA_URL =
+        "{% url 'latency_data' %}";
+</script>
+
+<script
+    src="{% static 'ngRadar_Website/js/history_events.js' %}"
+></script>
+
+<script
+    src="{% static 'ngRadar_Website/js/latency_chart.js' %}"
+></script>
 
 {% endblock %}

@@ -460,101 +460,106 @@ def send_kafka_message(
         "event_uuid": (
             str(event_uuid)
         ),
-
         "gbt_uuid": (
             str(gbt_uuid)
             if gbt_uuid
             else None
         ),
-
         "gbt_event_time": (
             gbt_event_time
             if gbt_event_time
             else None
         ),
-
         "transfer_uuid": (
             str(transfer_uuid)
             if transfer_uuid
             else None
         ),
-
         "retry_count": (
             int(retry_count)
         ),
-
         "object_id": (
             object_id
+            if object_id is not None
+                else None
         ),
-
         "target": (
             target
+            if target is not None
+            else None
         ),
-
         "tx_waveform": (
             tx_waveform
+            if tx_waveform is not None
+                else None
         ),
-
         "rec_waveform": (
             rec_waveform
+            if rec_waveform is not None
+                else None
         ),
-
         "product_type": (
             product_type
+            if product_type is not None
+                else None
         ),
-
         "product_id": (
             str(product_id)
             if product_id is not None
-            else None
+                else None
         ),
-
+        "status_name": (
+            status.name
+            if status is not None
+                else None
+        ),
+        "status_label": (
+            status.label
+            if status is not None   # Needed for UI
+                else None
+        ),
         "station": (
             int(station)
         ),
-
         "station_name": (
-            station.label
+            station.label   # Needed for UI.
         ),
-
         "status": (
             int(status)
             if status is not None
-            else None
+                else None
         ),
-
         "xmit_station": (
             int(xmit_station)
             if xmit_station is not None
-            else None
+                else None
         ),
-
         "rcvr_station": (
             int(rcvr_station)
             if rcvr_station is not None
-            else None
+                else None
         ),
-
         "image_key": (
             image_key
+            if image_key is not None
+                else None
         ),
-
         "filename": (
             filename
+            if filename is not None
+                else None
         ),
-
         "num_bytes": (
             int(num_bytes)
+            if num_bytes is not None
+                else 0
         ),
-
         "latency_ms": (
             float(latency_ms)
         ),
-
         "message": (
             message
         ),
-
         "event_time": (
             datetime.now(
                 timezone.utc
@@ -577,6 +582,7 @@ def send_kafka_message(
         return None
 
     return event_uuid
+
 
 
 def consumer_group_has_members(

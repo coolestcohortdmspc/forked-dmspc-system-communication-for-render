@@ -393,3 +393,10 @@
 .tooltip.bs-tooltip-end .tooltip-arrow::before {
     border-right-color: #6c757d;
 }
+
+
+/* Latency graph styles: */
+#LatencyChart {
+    background: #ffffff;
+    padding: 20px 25px;
+}

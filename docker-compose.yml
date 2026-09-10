@@ -699,13 +699,13 @@ services:
 
 volumes:
   postgres_data:
-  staging_dump:
   seaweed_data:
   dsoc_transfer:
   vlba_data:
   portainer_data:
   prometheus_data:
   grafana_data:
+  volumes:
 
 networks:
   ngradar_website_network:
