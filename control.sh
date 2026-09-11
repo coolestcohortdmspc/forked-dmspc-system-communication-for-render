@@ -21,18 +21,18 @@ REMOTE_DIR="/root/${REMOTE_REPO}"
 KAFKA_PROFILES="--profile kafka"
 
 # the order of these services matter!! learned the hard way..
-KAFKA_SERVICES="zookeeper kafka-broker-1 kafka-broker-2 kafka-broker-3 kafka-init kafka-ui kafka-exporter seaweedfs dsoc-volume-init"
+KAFKA_SERVICES="kafka-exporter kafka-node-1 kafka-node-2 kafka-node-3 kafka-init kafka-ui seaweedfs dsoc-volume-init"
 SIM_SERVICES="etr_daemon gbt vlba dsoc"
 
 PORTAINER_SERVICE="portainer"
 AGENT_SERVICE="portainer_agent"
 
 # TODO add the commented vlba sims when scaling up! (vlba9 and vlba10 should start before gbt)
-DSOC_SERVICES="traefik ngradar_website postgres prometheus grafana postgres_exporter zookeeper kafka-broker-1 kafka-init kafka-ui kafka-exporter seaweedfs dsoc-volume-init dsoc etr_daemon"  # vlba7 vlba8
-VLBA_1_SERVICES="kafka-broker-3 vlba"  # vlba2
+DSOC_SERVICES="traefik ngradar_website postgres prometheus grafana postgres_exporter zookeeper kafka-node-1 kafka-init kafka-ui kafka-exporter seaweedfs dsoc-volume-init dsoc etr_daemon"  # vlba7 vlba8
+VLBA_1_SERVICES="kafka-node-3 vlba"  # vlba2
 VLBA_2_SERVICES="vlba3 vlba4"
 VLBA_3_SERVICES="vlba5 vlba6"
-GBT_SERVICES="kafka-broker-2 gbt"  # vlba9 vlba10
+GBT_SERVICES="kafka-node-2 gbt"  # vlba9 vlba10
 
 COMMAND="$1"
 
