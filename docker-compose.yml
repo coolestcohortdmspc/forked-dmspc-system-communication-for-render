@@ -457,16 +457,16 @@ services:
 
     #   # Kafka's internal container port
     #   - "traefik.tcp.services.kafka.loadbalancer.server.port=9092"
-    healthcheck:
-      test:
-        [
-          "CMD-SHELL",
-          "KAFKA_OPTS='' kafka-topics --bootstrap-server ${KAFKA_EXTERNAL_HOST:-kafka-node-1}:19092 --list >/dev/null 2>&1", 
-        ]
-      interval: 5s
-      timeout: 5s
-      retries: 20
-      start_period: 15s
+    # healthcheck:
+    #   test:
+    #     [
+    #       "CMD-SHELL",
+    #       "KAFKA_OPTS='' kafka-topics --bootstrap-server ${KAFKA_EXTERNAL_HOST:-kafka-node-1}:9091 --list >/dev/null 2>&1", 
+    #     ]
+    #   interval: 5s
+    #   timeout: 5s
+    #   retries: 20
+    #   start_period: 15s
     
 
 
@@ -522,16 +522,16 @@ services:
 
     #   # Kafka's internal container port
     #   - "traefik.tcp.services.kafka.loadbalancer.server.port=9092"
-    healthcheck:
-      test:
-        [
-          "CMD-SHELL",
-          "KAFKA_OPTS='' kafka-topics --bootstrap-server ${KAFKA_EXTERNAL_HOST:-kafka-node-2}:9092 --list >/dev/null 2>&1", 
-        ]
-      interval: 5s
-      timeout: 5s
-      retries: 20
-      start_period: 15s
+    # healthcheck:
+    #   test:
+    #     [
+    #       "CMD-SHELL",
+    #       "KAFKA_OPTS='' kafka-topics --bootstrap-server ${KAFKA_EXTERNAL_HOST:-kafka-node-2}:9092 --list >/dev/null 2>&1", 
+    #     ]
+    #   interval: 5s
+    #   timeout: 5s
+    #   retries: 20
+    #   start_period: 15s
     
 
 
@@ -587,16 +587,16 @@ services:
 
     #   # Kafka's internal container port
     #   - "traefik.tcp.services.kafka.loadbalancer.server.port=9092"
-    healthcheck:
-      test:
-        [
-          "CMD-SHELL",
-          "KAFKA_OPTS='' kafka-topics --bootstrap-server ${KAFKA_EXTERNAL_HOST:-kafka-node-3}:9093 --list >/dev/null 2>&1", 
-        ]
-      interval: 5s
-      timeout: 5s
-      retries: 20
-      start_period: 15s
+    # healthcheck:
+    #   test:
+    #     [
+    #       "CMD-SHELL",
+    #       "KAFKA_OPTS='' kafka-topics --bootstrap-server ${KAFKA_EXTERNAL_HOST:-kafka-node-3}:9093 --list >/dev/null 2>&1", 
+    #     ]
+    #   interval: 5s
+    #   timeout: 5s
+    #   retries: 20
+    #   start_period: 15s
     
 
 
