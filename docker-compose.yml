@@ -578,24 +578,14 @@ services:
       target: etc
     env_file:
       - .env
-    # depends_on:
-      # postgres:
-      #   condition: service_healthy
-      # kafka-broker:
-      #   condition: service_healthy
-      # kafka-init:
-      #   condition: service_completed_successfully
-      # etr_daemon:
-      #   condition: service_started
     volumes:
       - .:/service
       - vlba_data:/raw_data
     networks:
       - ngradar_website_network
     profiles: ["kafka"]
+    restart: unless-stopped
     environment:
-      # ETD_DESTINATION: "etr_daemon:/dsoc/incoming/" # NO LONGER SHARED VOLUME - GET RID OF THIS WHEN WE FIGURE OUT HOW TO DO E-TRANSFER OVER PUBLIC INTERNET
-      # BOOTSTRAP_SERVER: ${WEBSITE_DOMAIN}:9092
       BOOTSTRAP_SERVER: ${BOOTSTRAP_SERVER:-kafka-broker:29092}
       ETD_HOST: ${ETD_HOST}
       ETD_COMMAND_PORT: ${ETD_COMMAND_PORT:-4004}
@@ -603,7 +593,76 @@ services:
       - python
       - manage.py
       - vlba_sim
+  
 
+  vlba-sc:
+    extends: vlba
+    container_name: vlba-SC
+    environment:
+      STATION_NAME: SC
+
+
+  vlba-hn:
+    extends: vlba
+    container_name: vlba-HN
+    environment:
+      STATION_NAME: HN
+  
+
+  vlba-nl:
+    extends: vlba
+    container_name: vlba-NL
+    environment:
+      STATION_NAME: NL
+
+
+  vlba-fd:
+    extends: vlba
+    container_name: vlba-FD
+    environment:
+      STATION_NAME: FD
+
+  
+  vlba-la:
+    extends: vlba
+    container_name: vlba-LA
+    environment:
+      STATION_NAME: LA
+
+
+  vlba-pt:
+    extends: vlba
+    container_name: vlba-PT
+    environment:
+      STATION_NAME: PT
+  
+
+  vlba-kp:
+    extends: vlba
+    container_name: vlba-KP
+    environment:
+      STATION_NAME: KP
+
+
+  vlba-ov:
+    extends: vlba
+    container_name: vlba-OV
+    environment:
+      STATION_NAME: OV
+  
+
+  vlba-br:
+    extends: vlba
+    container_name: vlba-BR
+    environment:
+      STATION_NAME: BR
+
+
+  vlba-mk:
+    extends: vlba
+    container_name: vlba-MK
+    environment:
+      STATION_NAME: MK
 
 
 #==========================

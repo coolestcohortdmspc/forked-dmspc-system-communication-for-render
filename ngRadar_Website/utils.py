@@ -453,6 +453,8 @@ def etc_send(frame_path):
         f"tcp://{etd_host}#{etd_command_port}:/dsoc/incoming/"
     )
 
+    os.environ["ETD_DESTINATION"] = etd_destination
+
     process = subprocess.Popen(
         [
             "etc",

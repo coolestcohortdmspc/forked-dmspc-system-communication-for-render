@@ -200,13 +200,14 @@ def track_etransfer_progress(payload, incoming_file: Path):
                 # vlba is alive, the transfer is just slow. Start the clock over.
                 last_progress_at = time.monotonic()
             else:
+                vlba_station = Stations(station)
                 record_transfer_event(
                     transfer_uuid=transfer_uuid,
                     gbt_uuid=payload["gbt_uuid"],
                     station=Stations.DSOC,
                     status=Status.FAILED,
                     num_bytes=num_bytes,
-                    message="Hancock VLBA went offline mid-transfer. Transfer interrupted.",
+                    message=f"VLBA-{vlba_station.name} went offline mid-transfer. Transfer interrupted.",
                 )
                 break
 
@@ -315,6 +316,8 @@ def process_msg(msg, producer_topic, producer_config):
         key = f"{Message.VLBA_DELETE}"
         incoming_file = volume_folder / f"{payload['transfer_uuid']}.bin"
 
+        vlba_station = Stations(station)
+
         try:
             track_etransfer_progress(payload, incoming_file)
 
@@ -324,7 +327,7 @@ def process_msg(msg, producer_topic, producer_config):
                 station=station,
                 status=Status.TRANSFERRED,
                 num_bytes=payload["num_bytes"],
-                message="Hancock VLBA e-transfer complete",
+                message=f"VLBA-{vlba_station.name} e-transfer complete",
             )
             record_transfer_event(
                 transfer_uuid=payload["transfer_uuid"],

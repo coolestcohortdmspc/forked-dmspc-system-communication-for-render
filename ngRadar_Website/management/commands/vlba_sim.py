@@ -37,13 +37,12 @@ FAILURE_REASONS = {
 # disk), which would otherwise retry at full speed forever.
 MAX_RESUME_ATTEMPTS = 5
 
-STATION = Stations.HN
-"""
-Use this constant instead once Ty's docker changes are in:
+# STATION = Stations.HN
+# Use this constant instead once Ty's docker changes are in:
 
 STATION_NAME = os.environ.get("STATION_NAME")
 STATION = Stations[STATION_NAME]
-"""
+
 
 def process_msg(msg, producer_topic, producer_config):
     incoming_key = int(msg.key().decode("utf-8"))
@@ -70,7 +69,7 @@ def process_msg(msg, producer_topic, producer_config):
                     station=STATION,
                     status=Status.READY,
                     num_bytes=num_bytes,
-                    message="Hancock VLBA data file complete. Ready for e-transfer.",
+                    message=f"VLBA-{STATION.name} data file complete. Ready for e-transfer.",
                 )
             send_kafka_message(
                 key = key,
@@ -106,9 +105,14 @@ def process_msg(msg, producer_topic, producer_config):
 
     
     elif incoming_key == Message.DSOC_RESPOND_STORAGE.value:
-        print("Received DSOC's storage check response!")
         key = f"{Message.VLBA_TRANSFERRING}"
         payload = json.loads(msg.value().decode("utf-8"))
+
+        # Check if the Kafka message is for this station
+        if payload["station"] != STATION:
+            return
+
+        print("Received DSOC's storage check response!")
 
         if payload["message"] == "Yes":
 
@@ -125,7 +129,7 @@ def process_msg(msg, producer_topic, producer_config):
                         station=STATION,
                         status=Status.TRANSFERRING,
                         num_bytes=payload["num_bytes"],
-                        message="Hancock VLBA e-transfer in progress",
+                        message=f"VLBA-{STATION.name} e-transfer in progress",
                     )
 
                     send_kafka_message(
@@ -138,7 +142,7 @@ def process_msg(msg, producer_topic, producer_config):
                         num_bytes=payload["num_bytes"],
                         filename=payload["filename"],
                         station=STATION,
-                        message="Hancock VLBA has started to send the data file to DSOC via e-transfer",
+                        message=f"VLBA-{STATION.name} has started to send the data file to DSOC via e-transfer",
                     )
                     frame_path = raw_data_path / f"{payload['transfer_uuid']}.bin"
 
@@ -202,6 +206,11 @@ def process_msg(msg, producer_topic, producer_config):
 
     elif incoming_key == Message.VLBA_DELETE.value:
         payload = json.loads(msg.value().decode("utf-8"))
+
+        # Check if the Kafka message is for this station
+        if payload["station"] != STATION:
+            return
+
         file_name = payload["filename"]
         delete_observation_data(file_name)
 
