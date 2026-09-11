@@ -28,7 +28,7 @@ PORTAINER_SERVICE="portainer"
 AGENT_SERVICE="portainer_agent"
 
 # TODO add the commented vlba sims when scaling up! (vlba9 and vlba10 should start before gbt)
-DSOC_SERVICES="traefik ngradar_website postgres prometheus grafana postgres_exporter zookeeper kafka-node-1 kafka-init kafka-ui kafka-exporter seaweedfs dsoc-volume-init dsoc etr_daemon"  # vlba7 vlba8
+DSOC_SERVICES="traefik ngradar_website postgres prometheus grafana postgres_exporter kafka-node-1 kafka-init kafka-ui kafka-exporter seaweedfs dsoc-volume-init dsoc etr_daemon"  # vlba7 vlba8
 VLBA_1_SERVICES="kafka-node-3 vlba"  # vlba2
 VLBA_2_SERVICES="vlba3 vlba4"
 VLBA_3_SERVICES="vlba5 vlba6"

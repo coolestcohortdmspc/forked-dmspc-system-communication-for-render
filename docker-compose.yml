@@ -835,11 +835,6 @@ volumes:
   portainer_data:
   prometheus_data:
   grafana_data:
-  zookeeper-data:
-  zookeeper-log:
-  kafka-1-data:
-  kafka-2-data:
-  kafka-3-data:
 
 networks:
   ngradar_website_network:
