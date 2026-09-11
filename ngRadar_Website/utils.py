@@ -136,7 +136,7 @@ def config_func(sim, bootstrap):
 
 def bootstrap(sim):
     """
-    Description: Extracts bootstrap info from .env and ngrok, then uses config_func to generate outputs
+    Description: Extracts bootstrap info from .env, then uses config_func to generate outputs
     Inputs: sim = the sim file in use (GBT, DSOC, or VLBA)
     Returns: topic(s) and config(s) variables
     """
@@ -154,7 +154,7 @@ def bootstrap(sim):
     # if not bootstrap:
     #     raise RuntimeError("BOOTSTRAP_SERVER not found in /out/ngrok_endpoint.env")
 
-    bootstrap = os.getenv("BOOTSTRAP_SERVER", "kafka-broker:29092")
+    bootstrap = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "kafka-broker:29092")
     
     # if sim != Stations.DSOC:
     #     producer_topic, producer_config, consumer_topic, consumer_config = config_func(sim, bootstrap)

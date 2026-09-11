@@ -143,7 +143,7 @@ services:
       - "80:80" # website HTTP
       - "127.0.0.1:8080:8080" # dashboard
       - "5432:5432" # postgres
-      - "9092:9092" # kafka broker
+      # - "9092:9092" # kafka broker
       - "4004:4004" # etransfer command port
       - "8008:8008/udp" # etransfer data port
 
@@ -154,7 +154,7 @@ services:
       # EntryPoints
       - "--entrypoints.web.address=:80"
       - "--entrypoints.postgres.address=:5432"
-      - "--entrypoints.kafka.address=:9092"
+      # - "--entrypoints.kafka-1.address=:9092"
       - "--entrypoints.etransfer-command.address=:4004"
       - "--entrypoints.etransfer-data.address=:8008/udp"
 
@@ -241,17 +241,17 @@ services:
       postgres:
         condition: service_healthy
 
-  kafka-exporter:
+  kafka-exporter: # Scrape all 3 brokers if possible
     image: danielqsj/kafka-exporter:v1.9.0
     container_name: kafka-exporter
     restart: unless-stopped
     profiles: ["kafka"]
     command:
-      - "--kafka.server=kafka-broker:29092"
+      - "--kafka.server=kafka-broker-1:29091"
       - "--topic.exclude=^__.*"
       - "--refresh.metadata=15s"
     depends_on:
-      kafka-broker:
+      kafka-broker-1:
         condition: service_healthy
     networks:
       - ngradar_website_network
@@ -359,6 +359,11 @@ services:
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - 2181:2181
+    volumes:
+      - zookeeper-data:/var/lib/zookeeper/data
+      - zookeeper-log:/var/lib/zookeeper/log
     networks:
       - ngradar_website_network
 
@@ -369,9 +374,15 @@ services:
     container_name: kafka-init
     image: confluentinc/cp-kafka:7.5.1
     depends_on:
-      kafka-broker:
+      kafka-broker-1:
         condition: service_healthy
+    #   kafka-broker-2:
+    #     condition: service_healthy
+    #   kafka-broker-3:
+    #     condition: service_healthy
     profiles: ["kafka"]
+    environment:
+      - KAFKA_BOOTSTRAP_SERVERS=${KAFKA_BOOTSTRAP_SERVERS}
     networks:
       - ngradar_website_network
     entrypoint:
@@ -380,111 +391,173 @@ services:
     - |
       echo "Creating Kafka topics..."
 
-      kafka-topics --bootstrap-server kafka-broker:29092 \
+      kafka-topics --bootstrap-server "$KAFKA_BOOTSTRAP_SERVERS" \
         --create --if-not-exists \
         --topic user_input \
         --partitions 3 \
-        --replication-factor 1
+        --replication-factor 3 \
+        --config min.insync.replicas=2
 
-      kafka-topics --bootstrap-server kafka-broker:29092 \
+      kafka-topics --bootstrap-server "$KAFKA_BOOTSTRAP_SERVERS" \
         --create --if-not-exists \
         --topic GBT_data \
         --partitions 3 \
-        --replication-factor 1
+        --replication-factor 3 \
+        --config min.insync.replicas=2
 
-      kafka-topics --bootstrap-server kafka-broker:29092 \
+      kafka-topics --bootstrap-server "$KAFKA_BOOTSTRAP_SERVERS" \
         --create --if-not-exists \
         --topic VLBA_notif \
         --partitions 3 \
-        --replication-factor 1
+        --replication-factor 3 \
+        --config min.insync.replicas=2
 
-      kafka-topics --bootstrap-server kafka-broker:29092 \
+      kafka-topics --bootstrap-server "$KAFKA_BOOTSTRAP_SERVERS" \
         --create --if-not-exists \
         --topic DSOC_notif \
         --partitions 3 \
-        --replication-factor 1
+        --replication-factor 3 \
+        --config min.insync.replicas=2
 
       echo "Kafka topic initialization complete."
     restart: "no"
 
 
 
-# Commenting this out because we don't need it for local dev and we won't need it for the droplets on DO either.
-# But keeping it in case we ever do need ngrok again at some point?
-  # ngrok:
-  #   image: ngrok/ngrok:latest
-  #   profiles: ["kafka"]
-  #   env_file:
-  #     - .env
-  #   environment:
-  #     NGROK_AUTHTOKEN: ${NGROK_AUTHTOKEN}
-  #   depends_on:
-  #     kafka-broker:
-  #       condition: service_healthy
-  #     seaweedfs:
-  #       condition: service_started
-  #   volumes:
-  #     - ./ngrok.yml:/etc/ngrok.yml:ro
-  #   command:
-  #     - start
-  #     - --all
-  #     - --config
-  #     - /etc/ngrok.yml
-  #   networks:
-  #     - ngradar_website_network
-    
-
-  kafka-broker:
-    container_name: kafka-broker
+  kafka-broker-1:
+    container_name: kafka-broker-1
     user: "0:0"
     image: confluentinc/cp-kafka:7.5.1
     profiles: ["kafka"]
     depends_on:
       - zookeeper
     volumes:
-       - ./jmx-exporter:/opt/jmx-exporter:ro
-    # ports:
-    #   - ${PUBLIC_BIND_IP:-127.0.0.1}:9092:9092
+      - kafka-1-data:/var/lib/kafka/data
+      - ./jmx-exporter:/opt/jmx-exporter:ro
+    ports:
+      - "9091:9091"
+      - "29091:29091"
     environment:
-      KAFKA_LISTENERS: INTERNAL://0.0.0.0:29092,EXTERNAL://0.0.0.0:9092
-      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka-broker:29092,EXTERNAL://${KAFKA_EXTERNAL_HOST}:9092
+      KAFKA_LISTENERS: INTERNAL://0.0.0.0:29091,EXTERNAL://0.0.0.0:9091
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://${KAFKA_EXTERNAL_HOST:-kafka-broker-1}:29091,EXTERNAL://${KAFKA_EXTERNAL_HOST:-localhost}:9091
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
       KAFKA_BROKER_ID: 1
-      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      # KAFKA_LISTENERS: INTERNAL://0.0.0.0:29092,EXTERNAL://0.0.0.0:9092
-      # KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka-broker:29092,EXTERNAL://${WEBSITE_DOMAIN}:9092
-      # KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181 #container name bc zookeeper is local to broker-1
       KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
-      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
-      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 3
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 2
       KAFKA_OPTS: >-
         -javaagent:/opt/jmx-exporter/jmx_prometheus_javaagent-1.6.0.jar=7071:/opt/jmx-exporter/kafka.yml
     networks:
       - ngradar_website_network
-      - proxy
-    labels:
-      - "traefik.enable=true"
-      - "traefik.docker.network=proxy"
+      # - proxy
+    # labels:
+    #   - "traefik.enable=true"
+    #   - "traefik.docker.network=proxy"
 
-      - "traefik.tcp.routers.kafka.rule=HostSNI(`*`)"
-      - "traefik.tcp.routers.kafka.entrypoints=kafka"
-      - "traefik.tcp.routers.kafka.service=kafka"
+    #   - "traefik.tcp.routers.kafka.rule=HostSNI(`*`)"
+    #   - "traefik.tcp.routers.kafka.entrypoints=kafka"
+    #   - "traefik.tcp.routers.kafka.service=kafka"
 
-      # Kafka's internal container port
-      - "traefik.tcp.services.kafka.loadbalancer.server.port=9092"
+    #   # Kafka's internal container port
+    #   - "traefik.tcp.services.kafka.loadbalancer.server.port=9092"
     healthcheck:
       test:
         [
           "CMD-SHELL",
-          "KAFKA_OPTS='' kafka-topics --bootstrap-server kafka-broker:29092 --list >/dev/null 2>&1",
+          "KAFKA_OPTS='' kafka-topics --bootstrap-server ${KAFKA_EXTERNAL_HOST:-kafka-broker-1}:29091 --list >/dev/null 2>&1", 
         ]
       interval: 5s
       timeout: 5s
       retries: 20
       start_period: 15s
     
+
+
+  kafka-broker-2:
+    container_name: kafka-broker-2
+    user: "0:0"
+    image: confluentinc/cp-kafka:7.5.1
+    profiles: ["kafka"]
+    # depends_on:
+    #   - zookeeper
+    volumes:
+      - kafka-2-data:/var/lib/kafka/data
+      - ./jmx-exporter:/opt/jmx-exporter:ro
+    ports:
+      - "9092:9092"
+      - "29092:29092"
+    environment:
+      KAFKA_LISTENERS: INTERNAL://0.0.0.0:29092,EXTERNAL://0.0.0.0:9092
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://${KAFKA_EXTERNAL_HOST:-kafka-broker-2}:29092,EXTERNAL://${KAFKA_EXTERNAL_HOST:-localhost}:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_BROKER_ID: 2
+      KAFKA_ZOOKEEPER_CONNECT: ${ZOOKEEPER_HOST:-zookeeper}:2181 #hostname bc zookeeper is local to broker-1
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 3
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 2
+      KAFKA_OPTS: >-
+        -javaagent:/opt/jmx-exporter/jmx_prometheus_javaagent-1.6.0.jar=7071:/opt/jmx-exporter/kafka.yml
+    networks:
+      - ngradar_website_network
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "KAFKA_OPTS='' kafka-topics --bootstrap-server ${KAFKA_EXTERNAL_HOST:-kafka-broker-2}:29092 --list >/dev/null 2>&1", 
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 15s
+    
+
+
+
+  kafka-broker-3:
+    container_name: kafka-broker-3
+    user: "0:0"
+    image: confluentinc/cp-kafka:7.5.1
+    profiles: ["kafka"]
+    # depends_on:
+    #   - zookeeper
+    volumes:
+      - kafka-3-data:/var/lib/kafka/data
+      - ./jmx-exporter:/opt/jmx-exporter:ro
+    ports:
+      - "9093:9093"
+      - "29093:29093"
+    environment:
+      KAFKA_LISTENERS: INTERNAL://0.0.0.0:29093,EXTERNAL://0.0.0.0:9093
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://${KAFKA_EXTERNAL_HOST:-kafka-broker-3}:29093,EXTERNAL://${KAFKA_EXTERNAL_HOST:-localhost}:9093
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_BROKER_ID: 3
+      KAFKA_ZOOKEEPER_CONNECT: ${ZOOKEEPER_HOST:-zookeeper}:2181 #hostname bc zookeeper is local to broker-1
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 3
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 2
+      KAFKA_OPTS: >-
+        -javaagent:/opt/jmx-exporter/jmx_prometheus_javaagent-1.6.0.jar=7071:/opt/jmx-exporter/kafka.yml
+    networks:
+      - ngradar_website_network
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "KAFKA_OPTS='' kafka-topics --bootstrap-server ${KAFKA_EXTERNAL_HOST:-kafka-broker-3}:29093 --list >/dev/null 2>&1", 
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 15s
+    
+
 
   kafka-ui:
     container_name: kafka-ui
@@ -493,10 +566,12 @@ services:
     ports:
       - "8082:8080"
     environment:
-      KAFKA_CLUSTERS_0_NAME: local
-      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka-broker:29092
+      KAFKA_CLUSTERS_0_NAME: multi-broker-cluster
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: ${KAFKA_BOOTSTRAP_SERVERS}
     depends_on:
-      - kafka-broker
+      - kafka-broker-1
+      # - kafka-broker-2
+      # - kafka-broker-3
     networks:
       - ngradar_website_network
 
@@ -527,8 +602,7 @@ services:
       - ngradar_website_network
     profiles: ["kafka"]
     environment:
-      # BOOTSTRAP_SERVER: ${WEBSITE_DOMAIN}:9092
-      BOOTSTRAP_SERVER: ${BOOTSTRAP_SERVER:-kafka-broker:29092}
+      BOOTSTRAP_SERVER: ${KAFKA_BOOTSTRAP_SERVERS} # needs all 3 brokers
     entrypoint:
         - python
         - manage.py
@@ -548,7 +622,7 @@ services:
         condition: service_completed_successfully
       postgres:
         condition: service_healthy
-      kafka-broker:
+      kafka-broker-1:
         condition: service_healthy
       kafka-init:
         condition: service_completed_successfully
@@ -561,8 +635,7 @@ services:
       - ngradar_website_network
     profiles: ["kafka"]
     environment:
-      # BOOTSTRAP_SERVER: kafka-broker:29092
-      BOOTSTRAP_SERVER: ${BOOTSTRAP_SERVER:-kafka-broker:29092}
+      BOOTSTRAP_SERVER: ${KAFKA_BOOTSTRAP_SERVERS} #needs all 3 brokers 
     entrypoint:
         - python
         - manage.py
@@ -594,9 +667,7 @@ services:
       - ngradar_website_network
     profiles: ["kafka"]
     environment:
-      # ETD_DESTINATION: "etr_daemon:/dsoc/incoming/" # NO LONGER SHARED VOLUME - GET RID OF THIS WHEN WE FIGURE OUT HOW TO DO E-TRANSFER OVER PUBLIC INTERNET
-      # BOOTSTRAP_SERVER: ${WEBSITE_DOMAIN}:9092
-      BOOTSTRAP_SERVER: ${BOOTSTRAP_SERVER:-kafka-broker:29092}
+      BOOTSTRAP_SERVER: ${KAFKA_BOOTSTRAP_SERVERS} # eeds all 3 brokers bootstrap server
       ETD_HOST: ${ETD_HOST}
       ETD_COMMAND_PORT: ${ETD_COMMAND_PORT:-4004}
     entrypoint:
@@ -724,6 +795,11 @@ volumes:
   portainer_data:
   prometheus_data:
   grafana_data:
+  zookeeper-data:
+  zookeeper-log:
+  kafka-1-data:
+  kafka-2-data:
+  kafka-3-data:
 
 networks:
   ngradar_website_network:
