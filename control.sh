@@ -29,10 +29,10 @@ AGENT_SERVICE="portainer_agent"
 
 # TODO add the commented vlba sims when scaling up! (vlba-br and vlba-mk should start before gbt)
 DSOC_SERVICES="traefik ngradar_website postgres prometheus grafana postgres_exporter zookeeper kafka-broker kafka-init kafka-ui kafka-exporter seaweedfs dsoc-volume-init dsoc etr_daemon vlba-kp vlba-ov"
-VLBA_1_SERVICES="vlba-sc vlba-hn vlba-nl vlba-fd"
+VLBA_1_SERVICES="vlba-sc vlba-hn"
 VLBA_2_SERVICES="vlba-nl vlba-fd"
 VLBA_3_SERVICES="vlba-la vlba-pt"
-GBT_SERVICES="vlba-br vlba-mk vlba-la vlba-pt gbt"
+GBT_SERVICES="vlba-br vlba-mk gbt"
 
 COMMAND="$1"
 
@@ -203,13 +203,13 @@ droplets-up)
         "cd $REMOTE_DIR && git checkout tm/10-vlba-sims && git pull && ./control.sh vlba-up VLBA_1_SERVICES"
     
     # TODO use these for scaling up
-    # echo "Starting VLBA 2 Droplet"
-    # ssh "$VLBA_2_DROPLET" \
-    #     "cd $REMOTE_DIR && ./control.sh vlba-up VLBA_2_SERVICES"
+    echo "Starting VLBA 2 Droplet"
+    ssh "$VLBA_2_DROPLET" \
+        "cd $REMOTE_DIR && git checkout tm/10-vlba-sims && git pull && ./control.sh vlba-up VLBA_2_SERVICES"
 
-    # echo "Starting VLBA 3 Droplet"
-    # ssh "$VLBA_3_DROPLET" \
-    #     "cd $REMOTE_DIR && ./control.sh vlba-up VLBA_3_SERVICES"
+    echo "Starting VLBA 3 Droplet"
+    ssh "$VLBA_3_DROPLET" \
+        "cd $REMOTE_DIR && git checkout tm/10-vlba-sims && git pull && ./control.sh vlba-up VLBA_3_SERVICES"
     
     echo "Starting GBT Droplet"
     ssh "$GBT_DROPLET" \
@@ -231,14 +231,14 @@ droplets-down)
     ssh "$VLBA_1_DROPLET" \
         "cd $REMOTE_DIR && git checkout tm/10-vlba-sims && ./control.sh vlba-down VLBA_1_SERVICES"
     
-    # TODO use these for scaling up
-    # echo "Stopping VLBA 2 Droplet"
-    # ssh "$VLBA_2_DROPLET" \
-    #     "cd $REMOTE_DIR && ./control.sh vlba-down VLBA_2_SERVICES"
+    TODO use these for scaling up
+    echo "Stopping VLBA 2 Droplet"
+    ssh "$VLBA_2_DROPLET" \
+        "cd $REMOTE_DIR && git checkout tm/10-vlba-sims && ./control.sh vlba-down VLBA_2_SERVICES"
     
-    # echo "Stopping VLBA 3 Droplet"
-    # ssh "$VLBA_3_DROPLET" \
-    #     "cd $REMOTE_DIR && ./control.sh vlba-down VLBA_3_SERVICES"
+    echo "Stopping VLBA 3 Droplet"
+    ssh "$VLBA_3_DROPLET" \
+        "cd $REMOTE_DIR && git checkout tm/10-vlba-sims && ./control.sh vlba-down VLBA_3_SERVICES"
     
     echo "Stopping DSOC Droplet"
     ssh "$DSOC_DROPLET" \

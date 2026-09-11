@@ -584,6 +584,7 @@ services:
     networks:
       - ngradar_website_network
     profiles: ["kafka"]
+    restart: unless-stopped
     environment:
       BOOTSTRAP_SERVER: ${BOOTSTRAP_SERVER:-kafka-broker:29092}
       ETD_HOST: ${ETD_HOST}
